@@ -21,7 +21,6 @@ console.log(multi.feeds().length)             // => 0
 var w = multi.writer()
 console.log(w.key, w.writeable, w.readable)   // => Buffer <0x..> true true
 console.log(multi.feeds().length)             // => 1
-console.log(multi.feed(w.key).length)         // => 0
 
 // write data to any writeable feed, just like with hypercore
 w.append('foo', function () {
@@ -64,10 +63,6 @@ create a new local writeable feed
 ### var feeds = multi.feeds()
 
 array of hypercores
-
-### var feed = multi.feed(key)
-
-get hypercore by its key
 
 ### var stream = multi.replicate([opts])
 

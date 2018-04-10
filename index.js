@@ -52,9 +52,7 @@ Multicore.prototype.writer = function (cb) {
 }
 
 Multicore.prototype.feeds = function () {
-}
-
-Multicore.prototype.feed = function (key) {
+  return this._feeds.slice()
 }
 
 Multicore.prototype.replicate = function (opts) {
