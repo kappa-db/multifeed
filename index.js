@@ -32,14 +32,11 @@ Multicore.prototype.ready = function (cb) {
 Multicore.prototype._loadFeeds = function (cb) {
   var self = this
   ;(function next (n) {
-    console.log('loading feed', n)
     var st = self._storage(''+n)('key')
     st.read(0, 4, function (err) {
-      if (err) console.log('no feed @', n)
       if (err) return cb()
       var feed = self._hypercore(self._storage(''+n), self._opts)
       self._feeds.push(feed)
-      console.log('loaded feed', n)
       next(n+1)
     })
   })(0)
