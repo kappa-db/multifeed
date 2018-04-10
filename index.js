@@ -17,53 +17,44 @@ function Multicore (hypercore, storage, opts) {
       else return s(dir + '/' + name)
     }
   }
-  this._countStorage = createCountStorage(storage)
 
+  this._readies = []
+  this._ready = false
   var self = this
-  this._numFeeds = null
-  this._countStorage.open(function (err) {
-    if (err) {
-      var buf = Buffer.alloc(4)
-      buf.writeUInt32LE(0, 0)
-      self._countStorage.write(1, buf)
-    } else {
-      console.log('opened', err)
-
-      // Read how many hypercores exist in the multicore
-      // TODO: can I query storage somehow with random-access-storage, and avoid this?
-      self._countStorage.read(0, 4, function (err, buf) {
-        if (err) throw err
-        self._numFeeds = buf.readUInt32LE(0)
-        console.log('got # feeds', self._numFeeds)
-      })
-    }
+  this._loadFeeds(function () {
+    self._ready = true
+    self._readies.forEach(process.nextTick)
+    self._readies = []
   })
 }
 
-Multicore.prototype._addFeed = function (feed, cb) {
-  var buf = Buffer.alloc(4)
-  buf.writeUInt32LE(this.feeds.length + 1, 0)
-  console.log('gonna write', this.feeds.length + 1)
+Multicore.prototype.ready = function (cb) {
+  if (this._ready) return process.nextTick(cb)
+  else this._readies.push(cb)
+}
+
+Multicore.prototype._loadFeeds = function (cb) {
   var self = this
-  this._countStorage.write(0, buf, function (err) {
-    console.log('updated feed #', self.feeds.length + 1)
-    feed.ready(function () {
+  ;(function next (n) {
+    console.log('loading feed', n)
+    var st = self._storage(''+n)('key')
+    st.read(0, 4, function (err) {
+      if (err) console.log('no feed @', n)
+      if (err) return cb()
+      var feed = self._hypercore(self._storage(''+n), self._opts)
       self._feeds.push(feed)
-      cb()
+      console.log('loaded feed', n)
+      next(n+1)
     })
-  })
+  })(0)
 }
 
 Multicore.prototype.writer = function (cb) {
-  // Q: what to call other writers?
-  // Q: possible to get the key BEFORE doing storage writing?
-  // Q: can I just check if 'source(N-1)' exists before writing?
-  // could I just check 0, 1, 2, 3, ... and load them until I hit a no-exist?
-  //   how do you detect non-existance of a random-access-storage?
-  var feed = this._hypercore(this._storage('source'), this._opts)
-  this._addFeed(feed, function (err) {
-    if (err) return cb(err)
-    cb(null, feed)
+  var self = this
+  this.ready(function () {
+    var feed = self._hypercore(self._storage(''+self._feeds.length), self._opts)
+    self._feeds.push(feed)
+    feed.ready(cb.bind(null, null, feed))
   })
 }
 
@@ -75,9 +66,3 @@ Multicore.prototype.feed = function (key) {
 
 Multicore.prototype.replicate = function (opts) {
 }
-
-function createCountStorage (storage) {
-  if (typeof storage === 'string') return raf(path.join(storage, 'count'))
-  else return storage('count')
-}
-
