@@ -1,5 +1,6 @@
 var raf = require('random-access-file')
 var path = require('path')
+var readyify = require('./ready')
 
 module.exports = Multicore
 
@@ -18,19 +19,14 @@ function Multicore (hypercore, storage, opts) {
     }
   }
 
-  this._readies = []
-  this._ready = false
   var self = this
-  this._loadFeeds(function () {
-    self._ready = true
-    self._readies.forEach(process.nextTick)
-    self._readies = []
+  this._ready = readyify(function (done) {
+    self._loadFeeds(done)
   })
 }
 
 Multicore.prototype.ready = function (cb) {
-  if (this._ready) return process.nextTick(cb)
-  else this._readies.push(cb)
+  this._ready(cb)
 }
 
 Multicore.prototype._loadFeeds = function (cb) {
