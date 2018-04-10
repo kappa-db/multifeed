@@ -1,0 +1,24 @@
+{
+  "name": "multicore",
+  "description": "multi-writer hypercore",
+  "author": "Stephen Whitmore <sww@eight.net>",
+  "version": "0.0.0",
+  "repository": {
+    "url": "git://github.com/noffle/multicore.git"
+  },
+  "homepage": "https://github.com/noffle/multicore",
+  "bugs": "https://github.com/noffle/multicore/issues",
+  "main": "index.js",
+  "scripts": {
+    "test": "tape test/*.js",
+    "lint": "standard"
+  },
+  "keywords": [],
+  "dependencies": {},
+  "devDependencies": {
+    "random-access-memory": "^2.4.0",
+    "standard": "~10.0.0",
+    "tape": "~4.6.2"
+  },
+  "license": "ISC"
+}
