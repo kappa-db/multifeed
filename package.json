@@ -2,7 +2,7 @@
   "name": "multicore",
   "description": "multi-writer hypercore",
   "author": "Stephen Whitmore <sww@eight.net>",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "repository": {
     "url": "git://github.com/noffle/multicore.git"
   },
