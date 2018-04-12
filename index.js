@@ -25,9 +25,6 @@ function Multicore (hypercore, storage, opts) {
   var self = this
   this._ready = readyify(function (done) {
     var feed = hypercore(self._storage('fake'), new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex'))
-    feed.ready(function () {
-      console.log('fake', feed.discoveryKey.toString('hex'))
-    })
     self._fake = feed
     self._loadFeeds(done)
   })
@@ -77,9 +74,6 @@ Multicore.prototype.replicate = function (opts) {
 
   function serializeFeedBuf (feeds) {
     var myFeedKeys = feeds.map(function (feed) {
-      feed.on('upload', function (index, data) {
-        console.log('sent data for feed', feed.key.toString('hex'), index, data)
-      })
       return feed.key
     })
 
@@ -108,15 +102,9 @@ Multicore.prototype.replicate = function (opts) {
         return feed.key.equals(key)
       })
       if (!feeds.length) {
-        console.log('new feed', key.toString('hex'))
         var feed = self._hypercore(self._storage(''+self._feeds.length), key, self._opts)
         self._feeds.push(feed)
-        feed.on('download', function (index, data) {
-          console.log('got data for feed', feed.key.toString('hex'), index, data)
-        })
         replicate()
-      } else {
-        console.log('known feed')
       }
     })
   }
@@ -128,7 +116,6 @@ Multicore.prototype.replicate = function (opts) {
     if (firstWrite) {
       firstWrite = false
       this.push(feedWriteBuf)
-      console.log('did first write', feedWriteBuf.length, 'bytes')
     }
     this.push(buf)
     next()
@@ -136,11 +123,9 @@ Multicore.prototype.replicate = function (opts) {
 
   var firstRead = true
   var readStream = through(function (buf, _, next) {
-    // console.log('read', buf)
     if (firstRead) {
       firstRead = false
       var keys = deserializeFeedBuf(buf)
-      console.log('got 1st read', keys.length, 'keys')
       addMissingKeys(keys)
     } else {
       this.push(buf)
@@ -152,7 +137,6 @@ Multicore.prototype.replicate = function (opts) {
 
   if (!opts.live) {
     opts.stream.on('prefinalize', function (cb) {
-      console.log('PREFINALIZE', self._feeds.length, expectedFeeds)
       opts.stream.expectedFeeds += (self._feeds.length - expectedFeeds)
       expectedFeeds = self._feeds.length
       cb()
@@ -165,7 +149,6 @@ Multicore.prototype.replicate = function (opts) {
 
   function replicate () {
     self._feeds.forEach(function (feed) {
-      console.log('replicating', feed.key.toString('hex'))
       feed.replicate(opts)
     })
   }
