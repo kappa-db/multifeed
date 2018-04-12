@@ -10,9 +10,10 @@ the hypercores.
 
 ```js
 var multicore = require('multi-hypercore')
+var hypercore = require('hypercore')
 var ram = require('random-access-memory')
 
-var multi = multicore('./db', { valueEncoding: 'json' })
+var multi = multicore(hypercore, './db', { valueEncoding: 'json' })
 
 // a multi-hypercore starts off empty
 console.log(multi.feeds().length)             // => 0
@@ -52,7 +53,7 @@ function replicate (a, b, cb) {
 var multicore = require('multi-hypercore')
 ```
 
-### var multi = multicore(storage[, opts])
+### var multi = multicore(hypercore,storage[, opts])
 
 same params as hypercore creation; inherited by calls to `multi.writer()`
 
