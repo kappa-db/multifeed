@@ -68,7 +68,7 @@ array of hypercores
 
 create a duplex stream for replication
 
-just like hypercore, except *all* streams are replicated
+just like hypercore, except *all* hypercores are replicated
 
 ## Install
 
