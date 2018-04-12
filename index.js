@@ -1,5 +1,8 @@
 var raf = require('random-access-file')
 var path = require('path')
+var protocol = require('hypercore-protocol')
+var through = require('through2')
+var pumpify = require('pumpify')
 var readyify = require('./ready')
 
 module.exports = Multicore
@@ -21,6 +24,11 @@ function Multicore (hypercore, storage, opts) {
 
   var self = this
   this._ready = readyify(function (done) {
+    var feed = hypercore(self._storage('fake'), new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex'))
+    feed.ready(function () {
+      console.log('fake', feed.discoveryKey.toString('hex'))
+    })
+    self._fake = feed
     self._loadFeeds(done)
   })
 }
@@ -56,4 +64,118 @@ Multicore.prototype.feeds = function () {
 }
 
 Multicore.prototype.replicate = function (opts) {
+  if (!opts) opts = {}
+
+  var self = this
+  opts.expectedFeeds = this._feeds.length
+  var expectedFeeds = opts.expectedFeeds
+
+  // opts.live = true
+  opts.encrypt = false
+  opts.download = true
+  opts.stream = protocol(opts)
+
+  function serializeFeedBuf (feeds) {
+    var myFeedKeys = feeds.map(function (feed) {
+      feed.on('upload', function (index, data) {
+        console.log('sent data for feed', feed.key.toString('hex'), index, data)
+      })
+      return feed.key
+    })
+
+    var numFeedsBuf = Buffer.alloc(2)
+    numFeedsBuf.writeUInt16LE(myFeedKeys.length, 0)
+
+    return Buffer.concat([numFeedsBuf].concat(myFeedKeys))
+  }
+
+  function deserializeFeedBuf (buf) {
+    var numFeeds = buf.readUInt16LE(0)
+    var res = []
+
+    for (var i=0; i < numFeeds; i++) {
+      var offset = 2 + i * 32
+      var key = buf.slice(offset, offset + 32)
+      res.push(key)
+    }
+
+    return res
+  }
+
+  function addMissingKeys (keys) {
+    keys.forEach(function (key) {
+      var feeds = self._feeds.filter(function (feed) {
+        return feed.key.equals(key)
+      })
+      if (!feeds.length) {
+        console.log('new feed', key.toString('hex'))
+        var feed = self._hypercore(self._storage(''+self._feeds.length), key, self._opts)
+        self._feeds.push(feed)
+        feed.on('download', function (index, data) {
+          console.log('got data for feed', feed.key.toString('hex'), index, data)
+        })
+        replicate()
+      } else {
+        console.log('known feed')
+      }
+    })
+  }
+
+  var feedWriteBuf = serializeFeedBuf(this._feeds)
+
+  var firstWrite = true
+  var writeStream = through(function (buf, _, next) {
+    if (firstWrite) {
+      firstWrite = false
+      this.push(feedWriteBuf)
+      console.log('did first write', feedWriteBuf.length, 'bytes')
+    }
+    this.push(buf)
+    next()
+  })
+
+  var firstRead = true
+  var readStream = through(function (buf, _, next) {
+    // console.log('read', buf)
+    if (firstRead) {
+      firstRead = false
+      var keys = deserializeFeedBuf(buf)
+      console.log('got 1st read', keys.length, 'keys')
+      addMissingKeys(keys)
+    } else {
+      this.push(buf)
+    }
+    next()
+  })
+
+  var stream = pumpify(readStream, opts.stream, writeStream)
+
+  if (!opts.live) {
+    opts.stream.on('prefinalize', function (cb) {
+      console.log('PREFINALIZE', self._feeds.length, expectedFeeds)
+      opts.stream.expectedFeeds += (self._feeds.length - expectedFeeds)
+      expectedFeeds = self._feeds.length
+      cb()
+    })
+  }
+
+  this.ready(onready)
+
+  return stream
+
+  function replicate () {
+    self._feeds.forEach(function (feed) {
+      console.log('replicating', feed.key.toString('hex'))
+      feed.replicate(opts)
+    })
+  }
+
+  function onready (err) {
+    if (err) return stream.destroy(err)
+    if (stream.destroyed) return
+
+    self._fake.replicate(opts)
+
+    replicate()
+  }
 }

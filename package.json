@@ -14,7 +14,12 @@
     "lint": "standard"
   },
   "keywords": [],
-  "dependencies": {},
+  "dependencies": {
+    "duplexify": "^3.5.4",
+    "hypercore-protocol": "^6.6.4",
+    "pumpify": "^1.4.0",
+    "through2": "^2.0.3"
+  },
   "devDependencies": {
     "random-access-memory": "^2.4.0",
     "standard": "~10.0.0",

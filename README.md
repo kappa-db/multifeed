@@ -56,9 +56,9 @@ var multicore = require('multicore')
 
 same params as hypercore creation; inherited by calls to `multi.writer()`
 
-### var feed = multi.writer()
+### multi.writer(cb)
 
-create a new local writeable feed
+create a new local writeable feed; `cb(err, feed)`
 
 ### var feeds = multi.feeds()
 
