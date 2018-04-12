@@ -1,20 +1,20 @@
-# multicore
+# multi-hypercore
 
 > multi-writer hypercore
 
 Small module that manages multiple hypercores: yours are writeable, others' are
-not. Replicating with another multicore peers exchanges the content of all of
+not. Replicating with another multi-hypercore peers exchanges the content of all of
 the hypercores.
 
 ## Usage
 
 ```js
-var multicore = require('multicore')
+var multicore = require('multi-hypercore')
 var ram = require('random-access-memory')
 
 var multi = multicore('./db', { valueEncoding: 'json' })
 
-// a multicore starts off empty
+// a multi-hypercore starts off empty
 console.log(multi.feeds().length)             // => 0
 
 // create as many writeable feeds as you want; returns hypercores
@@ -49,7 +49,7 @@ function replicate (a, b, cb) {
 ## API
 
 ```js
-var multicore = require('multicore')
+var multicore = require('multi-hypercore')
 ```
 
 ### var multi = multicore(storage[, opts])
@@ -75,7 +75,7 @@ just like hypercore, except *all* hypercores are replicated
 With [npm](https://npmjs.org/) installed, run
 
 ```
-$ npm install multicore
+$ npm install multi-hypercore
 ```
 
 ## License
