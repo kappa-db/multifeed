@@ -2,9 +2,9 @@
 
 > multi-writer hypercore
 
-Small module that manages multiple hypercores: yours are writeable, others' are
-not. Replicating with another multi-hypercore peers exchanges the content of all of
-the hypercores.
+Small module that manages multiple hypercores: feeds you create locally are
+writeable, others' are readonly. Replicating with another multi-hypercore peers
+exchanges the content of all of the hypercores.
 
 ## Usage
 
@@ -53,23 +53,30 @@ function replicate (a, b, cb) {
 var multicore = require('multi-hypercore')
 ```
 
-### var multi = multicore(hypercore,storage[, opts])
+### var multi = multicore(hypercore, storage[, opts])
 
-same params as hypercore creation; inherited by calls to `multi.writer()`
+Pass in the a hypercore module (`require('hypercore')`), a
+[random-access-storage](https://github.com/random-access-storage/random-access-storage)
+backend, and options. Included `opts` are passed into new hypercores created,
+and are the same as
+[hypercore](https://github.com/mafintosh/hypercore#var-feed--hypercorestorage-key-options)'s.
 
 ### multi.writer(cb)
 
-create a new local writeable feed; `cb(err, feed)`
+Create a new local writeable feed. Returns a hypercore instance in the callback
+`cb`.
 
 ### var feeds = multi.feeds()
 
-array of hypercores
+An array of all hypercores in the multi-hypercore. Check a feed's `key` to
+find the one you want, or check its `writable` / `readable` properties.
 
 ### var stream = multi.replicate([opts])
 
-create a duplex stream for replication
+Create a duplex stream for replication.
 
-just like hypercore, except *all* hypercores are replicated
+Works just like hypercore, except *all* local hypercores are exchanged between
+replication endpoints.
 
 ## Install
 
@@ -78,6 +85,20 @@ With [npm](https://npmjs.org/) installed, run
 ```
 $ npm install multi-hypercore
 ```
+
+## Hacks
+
+1. `hypercore-protocol` requires the first feed exchanged to be common between
+   replicating peers. This prevents two strangers from exchanging sets of
+   hypercores. A "fake" hypercore with a hardcoded public key is included in the
+   code to bootstrap the replication process. I discarded the private key, but
+   even if I didn't, it doesn't let me do anything nefarious. You could patch
+   this with your own key of choice.
+2. `hypercore-protocol` requires all feed keys be known upfront: only discovery
+   keys are exchanged (`discoveryKey = hash(key)`), so this module wraps the
+   hypercore replication duplex stream in a secondary duplex stream that
+   exchanges feed public keys upfront before moving on to the hypercore
+   replication mechanism.
 
 ## License
 

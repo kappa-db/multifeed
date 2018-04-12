@@ -14,6 +14,9 @@ function Multicore (hypercore, storage, opts) {
 
   this._hypercore = hypercore
   this._opts = opts
+
+  // random-access-storage wrapper that wraps all hypercores in a directory
+  // structures. (dir/0, dir/1, ...)
   this._storage = function (dir) {
     return function (name) {
       var s = storage
@@ -24,8 +27,12 @@ function Multicore (hypercore, storage, opts) {
 
   var self = this
   this._ready = readyify(function (done) {
-    var feed = hypercore(self._storage('fake'), new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex'))
+    // Private key-less constant hypercore to bootstrap hypercore-protocol
+    // replication.
+    var publicKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
+    var feed = hypercore(self._storage('fake'), publicKey)
     self._fake = feed
+
     self._loadFeeds(done)
   })
 }
@@ -36,6 +43,9 @@ Multicore.prototype.ready = function (cb) {
 
 Multicore.prototype._loadFeeds = function (cb) {
   var self = this
+
+  // Hypercores are stored starting at 0 and incrementing by 1. A failed read
+  // at position 0 implies non-existance of the hypercore.
   ;(function next (n) {
     var st = self._storage(''+n)('key')
     st.read(0, 4, function (err) {
@@ -49,6 +59,7 @@ Multicore.prototype._loadFeeds = function (cb) {
 
 Multicore.prototype.writer = function (cb) {
   var self = this
+
   this.ready(function () {
     var feed = self._hypercore(self._storage(''+self._feeds.length), self._opts)
     self._feeds.push(feed)
@@ -67,34 +78,8 @@ Multicore.prototype.replicate = function (opts) {
   opts.expectedFeeds = this._feeds.length
   var expectedFeeds = opts.expectedFeeds
 
-  // opts.live = true
-  opts.encrypt = false
   opts.download = true
   opts.stream = protocol(opts)
-
-  function serializeFeedBuf (feeds) {
-    var myFeedKeys = feeds.map(function (feed) {
-      return feed.key
-    })
-
-    var numFeedsBuf = Buffer.alloc(2)
-    numFeedsBuf.writeUInt16LE(myFeedKeys.length, 0)
-
-    return Buffer.concat([numFeedsBuf].concat(myFeedKeys))
-  }
-
-  function deserializeFeedBuf (buf) {
-    var numFeeds = buf.readUInt16LE(0)
-    var res = []
-
-    for (var i=0; i < numFeeds; i++) {
-      var offset = 2 + i * 32
-      var key = buf.slice(offset, offset + 32)
-      res.push(key)
-    }
-
-    return res
-  }
 
   function addMissingKeys (keys) {
     keys.forEach(function (key) {
@@ -161,4 +146,28 @@ Multicore.prototype.replicate = function (opts) {
 
     replicate()
   }
+}
+
+function serializeFeedBuf (feeds) {
+  var myFeedKeys = feeds.map(function (feed) {
+    return feed.key
+  })
+
+  var numFeedsBuf = Buffer.alloc(2)
+  numFeedsBuf.writeUInt16LE(myFeedKeys.length, 0)
+
+  return Buffer.concat([numFeedsBuf].concat(myFeedKeys))
+}
+
+function deserializeFeedBuf (buf) {
+  var numFeeds = buf.readUInt16LE(0)
+  var res = []
+
+  for (var i=0; i < numFeeds; i++) {
+    var offset = 2 + i * 32
+    var key = buf.slice(offset, offset + 32)
+    res.push(key)
+  }
+
+  return res
 }
