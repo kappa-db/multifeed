@@ -29,7 +29,7 @@ test('create writer', function (t) {
 })
 
 test('replicate two multicores', function (t) {
-  t.plan(18)
+  t.plan(22)
 
   var m1 = multicore(hypercore, ram, { valueEncoding: 'json' })
   var m2 = multicore(hypercore, ram, { valueEncoding: 'json' })
@@ -37,9 +37,11 @@ test('replicate two multicores', function (t) {
   var feedEvents1 = 0
   var feedEvents2 = 0
   m1.on('feed', function (feed, idx) {
+    t.equals(idx, feedEvents1)
     feedEvents1++
   })
   m2.on('feed', function (feed, idx) {
+    t.equals(idx, feedEvents2)
     feedEvents2++
   })
 

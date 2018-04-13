@@ -68,7 +68,7 @@ Multicore.prototype.writer = function (cb) {
     var feed = self._hypercore(self._storage(''+self._feeds.length), self._opts)
     self._feeds.push(feed)
     feed.ready(function () {
-      self.emit('feed', feed, self.feeds.length-1)
+      self.emit('feed', feed, self._feeds.length-1)
       cb(null, feed, self.feeds.length-1)
     })
   })
@@ -96,7 +96,7 @@ Multicore.prototype.replicate = function (opts) {
       if (!feeds.length) {
         var feed = self._hypercore(self._storage(''+self._feeds.length), key, self._opts)
         self._feeds.push(feed)
-        self.emit('feed', feed, self.feeds.length-1)
+        self.emit('feed', feed, self._feeds.length-1)
         replicate()
       }
     })
