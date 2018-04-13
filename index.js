@@ -3,6 +3,8 @@ var path = require('path')
 var protocol = require('hypercore-protocol')
 var through = require('through2')
 var pumpify = require('pumpify')
+var events = require('events')
+var inherits = require('inherits')
 var readyify = require('./ready')
 
 module.exports = Multicore
@@ -37,6 +39,8 @@ function Multicore (hypercore, storage, opts) {
   })
 }
 
+inherits(Multicore, events.EventEmitter)
+
 Multicore.prototype.ready = function (cb) {
   this._ready(cb)
 }
@@ -63,7 +67,10 @@ Multicore.prototype.writer = function (cb) {
   this.ready(function () {
     var feed = self._hypercore(self._storage(''+self._feeds.length), self._opts)
     self._feeds.push(feed)
-    feed.ready(cb.bind(null, null, feed))
+    feed.ready(function () {
+      self.emit('feed', feed, self.feeds.length-1)
+      cb(null, feed, self.feeds.length-1)
+    })
   })
 }
 
@@ -89,6 +96,7 @@ Multicore.prototype.replicate = function (opts) {
       if (!feeds.length) {
         var feed = self._hypercore(self._storage(''+self._feeds.length), key, self._opts)
         self._feeds.push(feed)
+        self.emit('feed', feed, self.feeds.length-1)
         replicate()
       }
     })

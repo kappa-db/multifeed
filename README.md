@@ -78,6 +78,10 @@ Create a duplex stream for replication.
 Works just like hypercore, except *all* local hypercores are exchanged between
 replication endpoints.
 
+### multi.on('feed', function (feed, idx) { ... })
+
+Emitted whenever a new feed is added, whether locally or remotely.
+
 ## Install
 
 With [npm](https://npmjs.org/) installed, run
