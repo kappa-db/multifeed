@@ -83,3 +83,18 @@ test('replicate two multicores', function (t) {
     t.equals(feedEvents2, 2)
   }
 })
+
+test('regression test: concurrency of writer creation', function (t) {
+  t.plan(3)
+
+  var multi = multicore(hypercore, ram, { valueEncoding: 'json' })
+
+  multi.writer(function (err, w) {
+    t.error(err)
+    t.ok(w.key)
+  })
+
+  multi.ready(function () {
+    t.equals(multi.feeds().length, 0)
+  })
+})
