@@ -19,21 +19,24 @@ var multi = multicore(hypercore, './db', { valueEncoding: 'json' })
 console.log(multi.feeds().length)             // => 0
 
 // create as many writeable feeds as you want; returns hypercores
-var w = multi.writer()
-console.log(w.key, w.writeable, w.readable)   // => Buffer <0x..> true true
-console.log(multi.feeds().length)             // => 1
+multi.writer(function (err, w) {
+  console.log(w.key, w.writeable, w.readable)   // => Buffer <0x..> true true
+  console.log(multi.feeds().length)             // => 1
 
-// write data to any writeable feed, just like with hypercore
-w.append('foo', function () {
-  var m2 = multicore(ram, { valueEncoding: 'json' })
-  m2.writer().append('bar', function () {
-    replicate(multi, m2, function () {
-      console.log(m2.feeds().length)        // => 2
-      m2.feeds()[1].get(0, function (_, data) {
-        console.log(data)                   // => foo
-      })
-      multi.feeds()[1].get(0, function (_, data) {
-        console.log(data)                   // => bar
+  // write data to any writeable feed, just like with hypercore
+  w.append('foo', function () {
+    var m2 = multicore(ram, { valueEncoding: 'json' })
+    m2.writer(function (err, w2) {
+      w2.append('bar', function () {
+        replicate(multi, m2, function () {
+          console.log(m2.feeds().length)        // => 2
+          m2.feeds()[1].get(0, function (_, data) {
+            console.log(data)                   // => foo
+          })
+          multi.feeds()[1].get(0, function (_, data) {
+            console.log(data)                   // => bar
+          })
+        })
       })
     })
   })
@@ -70,6 +73,10 @@ Create a new local writeable feed. Returns a hypercore instance in the callback
 
 An array of all hypercores in the multi-hypercore. Check a feed's `key` to
 find the one you want, or check its `writable` / `readable` properties.
+
+### var feed = multi.feed(key)
+
+Fetch a feed by its key `key` (a `Buffer`).
 
 ### var stream = multi.replicate([opts])
 

@@ -78,6 +78,13 @@ Multicore.prototype.feeds = function () {
   return this._feeds.slice()
 }
 
+Multicore.prototype.feed = function (key) {
+  for (var i = 0; i < this._feeds.length; i++) {
+    if (this._feeds[i].key.equals(key)) return this.feeds[i]
+  }
+  return null
+}
+
 Multicore.prototype.replicate = function (opts) {
   if (!opts) opts = {}
 
