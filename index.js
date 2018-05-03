@@ -80,7 +80,7 @@ Multicore.prototype.feeds = function () {
 
 Multicore.prototype.feed = function (key) {
   for (var i = 0; i < this._feeds.length; i++) {
-    if (this._feeds[i].key.equals(key)) return this.feeds[i]
+    if (this._feeds[i].key.equals(key)) return this._feeds[i]
   }
   return null
 }

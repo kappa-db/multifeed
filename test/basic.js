@@ -28,6 +28,18 @@ test('create writer', function (t) {
   })
 })
 
+test('get feed by key', function (t) {
+  t.plan(2)
+
+  var multi = multicore(hypercore, ram, { valueEncoding: 'json' })
+
+  multi.writer(function (err, w) {
+    t.error(err, 'valid writer created')
+    var feed = multi.feed(w.key)
+    t.deepEquals(feed, w, 'writer is the same as retrieved feed')
+  })
+})
+
 test('replicate two multicores', function (t) {
   t.plan(22)
 
