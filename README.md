@@ -64,7 +64,7 @@ backend, and options. Included `opts` are passed into new hypercores created,
 and are the same as
 [hypercore](https://github.com/mafintosh/hypercore#var-feed--hypercorestorage-key-options)'s.
 
-### multi.writer(cb)
+### multi.writer([name, ]cb)
 
 If no `name` is given, a new local writeable feed is created and returned via
 `cb`.
