@@ -6,16 +6,19 @@ var pumpify = require('pumpify')
 var events = require('events')
 var inherits = require('inherits')
 var readyify = require('./ready')
+var mutexify = require('mutexify')
 
 module.exports = Multicore
 
 function Multicore (hypercore, storage, opts) {
   if (!(this instanceof Multicore)) return new Multicore(hypercore, storage, opts)
 
-  this._feeds = []
+  this._feeds = {}
 
   this._hypercore = hypercore
   this._opts = opts
+
+  this.writerLock = mutexify()
 
   // random-access-storage wrapper that wraps all hypercores in a directory
   // structures. (dir/0, dir/1, ...)
@@ -51,36 +54,74 @@ Multicore.prototype._loadFeeds = function (cb) {
   // Hypercores are stored starting at 0 and incrementing by 1. A failed read
   // at position 0 implies non-existance of the hypercore.
   ;(function next (n) {
-    var st = self._storage(''+n)('key')
+    var storage = self._storage(''+n)
+    var st = storage('key')
     st.read(0, 4, function (err) {
       if (err) return cb()
-      var feed = self._hypercore(self._storage(''+n), self._opts)
-      self._feeds.push(feed)
+      var feed = self._hypercore(storage, self._opts)
+      readStringFromStorage(storage('localname'), function (err, name) {
+        if (!err && name) {
+          self._feeds[name] = feed
+        } else {
+          self._feeds[''+n] = feed
+        }
+      })
       next(n+1)
     })
   })(0)
 }
 
-Multicore.prototype.writer = function (cb) {
+// TODO: wrap this in a mutex in case of two writers being created at the same
+// time
+Multicore.prototype.writer = function (name, cb) {
+  if (typeof name === 'function' && !cb) {
+    cb = name
+    name = undefined
+  }
   var self = this
 
+  // Short-circuit if already loaded
+  if (this._feeds[name]) {
+    process.nextTick(cb, null, this._feeds[name])
+    return
+  }
+
   this.ready(function () {
-    var feed = self._hypercore(self._storage(''+self._feeds.length), self._opts)
-    feed.ready(function () {
-      self._feeds.push(feed)
-      self.emit('feed', feed, self._feeds.length-1)
-      cb(null, feed, self.feeds.length-1)
+    self.writerLock(function (release) {
+      var len = Object.keys(self._feeds).length
+      var storage = self._storage(''+len)
+
+      var idx = name || String(len)
+
+      var nameStore = storage('localname')
+      writeStringToStorage(idx, nameStore, function (err) {
+        if (err) {
+          release(function () {
+            cb(err)
+          })
+          return
+        }
+        var feed = self._hypercore(storage, self._opts)
+        feed.ready(function () {
+          self._feeds[idx] = feed
+          self.emit('feed', feed, idx)
+          release(function () {
+            cb(null, feed, idx)
+          })
+        })
+      })
     })
   })
 }
 
 Multicore.prototype.feeds = function () {
-  return this._feeds.slice()
+  return Object.values(this._feeds)
 }
 
 Multicore.prototype.feed = function (key) {
-  for (var i = 0; i < this._feeds.length; i++) {
-    if (this._feeds[i].key.equals(key)) return this._feeds[i]
+  var feeds = Object.values(this._feeds)
+  for (var i = 0; i < feeds.length; i++) {
+    if (feeds[i].key.equals(key)) return feeds[i]
   }
   return null
 }
@@ -89,7 +130,7 @@ Multicore.prototype.replicate = function (opts) {
   if (!opts) opts = {}
 
   var self = this
-  opts.expectedFeeds = this._feeds.length
+  opts.expectedFeeds = Object.keys(this._feeds).length
   var expectedFeeds = opts.expectedFeeds
 
   opts.download = true
@@ -97,19 +138,21 @@ Multicore.prototype.replicate = function (opts) {
 
   function addMissingKeys (keys) {
     keys.forEach(function (key) {
-      var feeds = self._feeds.filter(function (feed) {
+      var feeds = Object.values(self._feeds).filter(function (feed) {
         return feed.key.equals(key)
       })
       if (!feeds.length) {
-        var feed = self._hypercore(self._storage(''+self._feeds.length), key, self._opts)
-        self._feeds.push(feed)
-        self.emit('feed', feed, self._feeds.length-1)
+        var numFeeds = Object.keys(self._feeds).length
+        var storage = self._storage(''+numFeeds)
+        var feed = self._hypercore(storage, key, self._opts)
+        self._feeds[numFeeds] = feed
+        self.emit('feed', feed, String(numFeeds))
         replicate()
       }
     })
   }
 
-  var feedWriteBuf = serializeFeedBuf(this._feeds)
+  var feedWriteBuf = serializeFeedBuf(Object.values(this._feeds))
 
   var firstWrite = true
   var writeStream = through(function (buf, _, next) {
@@ -137,8 +180,9 @@ Multicore.prototype.replicate = function (opts) {
 
   if (!opts.live) {
     opts.stream.on('prefinalize', function (cb) {
-      opts.stream.expectedFeeds += (self._feeds.length - expectedFeeds)
-      expectedFeeds = self._feeds.length
+      var numFeeds = Object.keys(self._feeds).length
+      opts.stream.expectedFeeds += (numFeeds - expectedFeeds)
+      expectedFeeds = numFeeds
       cb()
     })
   }
@@ -148,7 +192,7 @@ Multicore.prototype.replicate = function (opts) {
   return stream
 
   function replicate () {
-    self._feeds.forEach(function (feed) {
+    Object.values(self._feeds).forEach(function (feed) {
       feed.replicate(opts)
     })
   }
@@ -185,4 +229,40 @@ function deserializeFeedBuf (buf) {
   }
 
   return res
+}
+
+function writeJsonToStorage (obj, storage, cb) {
+  writeStringToStorage(JSON.stringify(obj), storage, cb)
+}
+
+function readJsonFromStorage (storage, cb) {
+  readStringFromStorage(storage, function (err, text) {
+    if (err) return cb(err)
+    try {
+      var obj = JSON.parse(text)
+      cb(null, obj)
+    } catch (e) {
+      cb(e)
+    }
+  })
+}
+
+// HACK: This is going to blow up our faces when somebody uses UTF-8 and it's
+// gonna be great. :D
+// TODO: what if the new data is shorter than the old data? things will break!
+function writeStringToStorage (string, storage, cb) {
+  var buf = Buffer.alloc(string.length)
+  storage.write(0, buf, cb)
+}
+
+function readStringFromStorage (storage, cb) {
+  storage.stat(function (err, stat) {
+    if (err) return cb(err)
+    var len = stat.size
+    storage.read(0, len, function (err, buf) {
+      if (err) return cb(err)
+      var str = buf.toString()
+      cb(null, str)
+    })
+  })
 }

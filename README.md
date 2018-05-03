@@ -66,13 +66,26 @@ and are the same as
 
 ### multi.writer(cb)
 
-Create a new local writeable feed. Returns a hypercore instance in the callback
+If no `name` is given, a new local writeable feed is created and returned via
 `cb`.
+
+If `name` is given and was created in the past on this local machine, it is
+returned. Otherwise it is created. This is useful for managing multiple local
+feeds, e.g.
+
+```js
+var main = multi.writer('main')        // created if doesn't exist
+var content = multi.writer('content')  // created if doesn't exist
+
+main === multi.writer('main')          // => true
+```
 
 ### var feeds = multi.feeds()
 
 An array of all hypercores in the multi-hypercore. Check a feed's `key` to
 find the one you want, or check its `writable` / `readable` properties.
+
+Only populated once `multi.ready(fn)` is fired.
 
 ### var feed = multi.feed(key)
 
@@ -85,7 +98,7 @@ Create a duplex stream for replication.
 Works just like hypercore, except *all* local hypercores are exchanged between
 replication endpoints.
 
-### multi.on('feed', function (feed, idx) { ... })
+### multi.on('feed', function (feed, name) { ... })
 
 Emitted whenever a new feed is added, whether locally or remotely.
 
