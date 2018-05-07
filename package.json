@@ -1,13 +1,13 @@
 {
-  "name": "multi-hypercore",
+  "name": "multifeed",
   "description": "multi-writer hypercore",
   "author": "Stephen Whitmore <sww@eight.net>",
   "version": "1.2.0",
   "repository": {
-    "url": "git://github.com/noffle/multi-hypercore.git"
+    "url": "git://github.com/noffle/multifeed.git"
   },
-  "homepage": "https://github.com/noffle/multi-hypercore",
-  "bugs": "https://github.com/noffle/multi-hypercore/issues",
+  "homepage": "https://github.com/noffle/multifeed",
+  "bugs": "https://github.com/noffle/multifeed/issues",
   "main": "index.js",
   "scripts": {
     "test": "tape test/*.js",

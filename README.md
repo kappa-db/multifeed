@@ -1,21 +1,21 @@
-# multi-hypercore
+# multifeed
 
 > multi-writer hypercore
 
 Small module that manages multiple hypercores: feeds you create locally are
-writeable, others' are readonly. Replicating with another multi-hypercore peers
+writeable, others' are readonly. Replicating with another multifeed peers
 exchanges the content of all of the hypercores.
 
 ## Usage
 
 ```js
-var multicore = require('multi-hypercore')
+var multifeed = require('multifeed')
 var hypercore = require('hypercore')
 var ram = require('random-access-memory')
 
-var multi = multicore(hypercore, './db', { valueEncoding: 'json' })
+var multi = multifeed(hypercore, './db', { valueEncoding: 'json' })
 
-// a multi-hypercore starts off empty
+// a multifeed starts off empty
 console.log(multi.feeds().length)             // => 0
 
 // create as many writeable feeds as you want; returns hypercores
@@ -25,7 +25,7 @@ multi.writer(function (err, w) {
 
   // write data to any writeable feed, just like with hypercore
   w.append('foo', function () {
-    var m2 = multicore(ram, { valueEncoding: 'json' })
+    var m2 = multifeed(ram, { valueEncoding: 'json' })
     m2.writer(function (err, w2) {
       w2.append('bar', function () {
         replicate(multi, m2, function () {
@@ -53,10 +53,10 @@ function replicate (a, b, cb) {
 ## API
 
 ```js
-var multicore = require('multi-hypercore')
+var multifeed = require('multifeed')
 ```
 
-### var multi = multicore(hypercore, storage[, opts])
+### var multi = multifeed(hypercore, storage[, opts])
 
 Pass in the a hypercore module (`require('hypercore')`), a
 [random-access-storage](https://github.com/random-access-storage/random-access-storage)
@@ -82,7 +82,7 @@ main === multi.writer('main')          // => true
 
 ### var feeds = multi.feeds()
 
-An array of all hypercores in the multi-hypercore. Check a feed's `key` to
+An array of all hypercores in the multifeed. Check a feed's `key` to
 find the one you want, or check its `writable` / `readable` properties.
 
 Only populated once `multi.ready(fn)` is fired.
@@ -107,7 +107,7 @@ Emitted whenever a new feed is added, whether locally or remotely.
 With [npm](https://npmjs.org/) installed, run
 
 ```
-$ npm install multi-hypercore
+$ npm install multifeed
 ```
 
 ## Hacks
