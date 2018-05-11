@@ -89,7 +89,7 @@ Only populated once `multi.ready(fn)` is fired.
 
 ### var feed = multi.feed(key)
 
-Fetch a feed by its key `key` (a `Buffer`).
+Fetch a feed by its key `key` (a `Buffer` or hex string).
 
 ### var stream = multi.replicate([opts])
 

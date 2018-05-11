@@ -125,11 +125,9 @@ Multicore.prototype.feeds = function () {
 }
 
 Multicore.prototype.feed = function (key) {
-  var feeds = Object.values(this._feeds)
-  for (var i = 0; i < feeds.length; i++) {
-    if (feeds[i].key.equals(key)) return feeds[i]
-  }
-  return null
+  if (Buffer.isBuffer(key)) key = key.toString('hex')
+  if (typeof key === 'string') return this._feedKeyToFeed[key]
+  else return null
 }
 
 Multicore.prototype.replicate = function (opts) {

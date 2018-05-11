@@ -30,14 +30,16 @@ test('create writer', function (t) {
 })
 
 test('get feed by key', function (t) {
-  t.plan(2)
+  t.plan(3)
 
   var multi = multicore(hypercore, ram, { valueEncoding: 'json' })
 
   multi.writer(function (err, w) {
     t.error(err, 'valid writer created')
     var feed = multi.feed(w.key)
-    t.deepEquals(feed, w, 'writer is the same as retrieved feed')
+    t.deepEquals(feed, w, 'writer is the same as retrieved feed (buffer key)')
+    feed = multi.feed(w.key.toString('hex'))
+    t.deepEquals(feed, w, 'writer is the same as retrieved feed (hex key)')
   })
 })
 
