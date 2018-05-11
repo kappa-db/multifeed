@@ -14,6 +14,7 @@ function Multicore (hypercore, storage, opts) {
   if (!(this instanceof Multicore)) return new Multicore(hypercore, storage, opts)
 
   this._feeds = {}
+  this._feedKeyToFeed = {}
 
   this._hypercore = hypercore
   this._opts = opts
@@ -44,6 +45,12 @@ function Multicore (hypercore, storage, opts) {
 
 inherits(Multicore, events.EventEmitter)
 
+Multicore.prototype._addFeed = function (feed, name) {
+  this._feeds[name] = feed
+  this._feedKeyToFeed[feed.key.toString('hex')] = feed
+  this.emit('feed', feed, name)
+}
+
 Multicore.prototype.ready = function (cb) {
   this._ready(cb)
 }
@@ -61,9 +68,9 @@ Multicore.prototype._loadFeeds = function (cb) {
       var feed = self._hypercore(storage, self._opts)
       readStringFromStorage(storage('localname'), function (err, name) {
         if (!err && name) {
-          self._feeds[name] = feed
+          self._addFeed(feed, name)
         } else {
-          self._feeds[''+n] = feed
+          self._addFeed(feed, String(n))
         }
       })
       next(n+1)
@@ -103,8 +110,7 @@ Multicore.prototype.writer = function (name, cb) {
         }
         var feed = self._hypercore(storage, self._opts)
         feed.ready(function () {
-          self._feeds[idx] = feed
-          self.emit('feed', feed, idx)
+          self._addFeed(feed, String(idx))
           release(function () {
             cb(null, feed, idx)
           })
@@ -145,8 +151,7 @@ Multicore.prototype.replicate = function (opts) {
         var numFeeds = Object.keys(self._feeds).length
         var storage = self._storage(''+numFeeds)
         var feed = self._hypercore(storage, key, self._opts)
-        self._feeds[numFeeds] = feed
-        self.emit('feed', feed, String(numFeeds))
+        self._addFeed(feed, String(numFeeds))
         replicate()
       }
     })
