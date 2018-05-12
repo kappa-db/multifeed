@@ -124,6 +124,12 @@ $ npm install multifeed
    exchanges feed public keys upfront before moving on to the hypercore
    replication mechanism.
 
+## See Also
+
+- [multifeed-index](https://github.com/noffle/multifeed-index)
+- [hypercore](https://github.com/mafintosh/hypercore)
+- [kappa-core](https://github.com/noffle/kappa-core)
+
 ## License
 
 ISC
