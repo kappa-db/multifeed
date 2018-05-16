@@ -78,8 +78,6 @@ Multicore.prototype._loadFeeds = function (cb) {
   })(0)
 }
 
-// TODO: wrap this in a mutex in case of two writers being created at the same
-// time
 Multicore.prototype.writer = function (name, cb) {
   if (typeof name === 'function' && !cb) {
     cb = name
