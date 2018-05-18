@@ -8,10 +8,10 @@ var inherits = require('inherits')
 var readyify = require('./ready')
 var mutexify = require('mutexify')
 
-module.exports = Multicore
+module.exports = Multifeed
 
-function Multicore (hypercore, storage, opts) {
-  if (!(this instanceof Multicore)) return new Multicore(hypercore, storage, opts)
+function Multifeed (hypercore, storage, opts) {
+  if (!(this instanceof Multifeed)) return new Multifeed(hypercore, storage, opts)
 
   this._feeds = {}
   this._feedKeyToFeed = {}
@@ -43,19 +43,19 @@ function Multicore (hypercore, storage, opts) {
   })
 }
 
-inherits(Multicore, events.EventEmitter)
+inherits(Multifeed, events.EventEmitter)
 
-Multicore.prototype._addFeed = function (feed, name) {
+Multifeed.prototype._addFeed = function (feed, name) {
   this._feeds[name] = feed
   this._feedKeyToFeed[feed.key.toString('hex')] = feed
   this.emit('feed', feed, name)
 }
 
-Multicore.prototype.ready = function (cb) {
+Multifeed.prototype.ready = function (cb) {
   this._ready(cb)
 }
 
-Multicore.prototype._loadFeeds = function (cb) {
+Multifeed.prototype._loadFeeds = function (cb) {
   var self = this
 
   // Hypercores are stored starting at 0 and incrementing by 1. A failed read
@@ -78,7 +78,7 @@ Multicore.prototype._loadFeeds = function (cb) {
   })(0)
 }
 
-Multicore.prototype.writer = function (name, cb) {
+Multifeed.prototype.writer = function (name, cb) {
   if (typeof name === 'function' && !cb) {
     cb = name
     name = undefined
@@ -118,17 +118,17 @@ Multicore.prototype.writer = function (name, cb) {
   })
 }
 
-Multicore.prototype.feeds = function () {
+Multifeed.prototype.feeds = function () {
   return Object.values(this._feeds)
 }
 
-Multicore.prototype.feed = function (key) {
+Multifeed.prototype.feed = function (key) {
   if (Buffer.isBuffer(key)) key = key.toString('hex')
   if (typeof key === 'string') return this._feedKeyToFeed[key]
   else return null
 }
 
-Multicore.prototype.replicate = function (opts) {
+Multifeed.prototype.replicate = function (opts) {
   if (!opts) opts = {}
 
   var self = this
