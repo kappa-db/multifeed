@@ -1,11 +1,11 @@
 var test = require('tape')
 var hypercore = require('hypercore')
-var multicore = require('..')
+var multifeed = require('..')
 var ram = require('random-access-memory')
 var tmp = require('tmp').tmpNameSync
 
 test('no feeds', function (t) {
-  var multi = multicore(hypercore, ram, { valueEncoding: 'json' })
+  var multi = multifeed(hypercore, ram, { valueEncoding: 'json' })
 
   t.deepEquals(multi.feeds(), [])
   t.end()
@@ -14,7 +14,7 @@ test('no feeds', function (t) {
 test('create writer', function (t) {
   t.plan(5)
 
-  var multi = multicore(hypercore, ram, { valueEncoding: 'json' })
+  var multi = multifeed(hypercore, ram, { valueEncoding: 'json' })
 
   multi.writer(function (err, w) {
     t.error(err)
@@ -32,7 +32,7 @@ test('create writer', function (t) {
 test('get feed by key', function (t) {
   t.plan(3)
 
-  var multi = multicore(hypercore, ram, { valueEncoding: 'json' })
+  var multi = multifeed(hypercore, ram, { valueEncoding: 'json' })
 
   multi.writer(function (err, w) {
     t.error(err, 'valid writer created')
@@ -46,7 +46,7 @@ test('get feed by key', function (t) {
 test('get localfeed by name', function (t) {
   t.plan(3)
 
-  var multi = multicore(hypercore, ram, { valueEncoding: 'json' })
+  var multi = multifeed(hypercore, ram, { valueEncoding: 'json' })
 
   multi.writer('bob', function (err, w) {
     t.error(err, 'valid writer created')
@@ -57,11 +57,11 @@ test('get localfeed by name', function (t) {
   })
 })
 
-test('replicate two multicores', function (t) {
+test('replicate two multifeeds', function (t) {
   t.plan(22)
 
-  var m1 = multicore(hypercore, ram, { valueEncoding: 'json' })
-  var m2 = multicore(hypercore, ram, { valueEncoding: 'json' })
+  var m1 = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })
 
   var feedEvents1 = 0
   var feedEvents2 = 0
@@ -119,7 +119,7 @@ test('get localfeed by name across disk loads', function (t) {
   var storage = tmp()
   var key
 
-  var multi = multicore(hypercore, storage, { valueEncoding: 'json' })
+  var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
 
   multi.writer('minuette', function (err, w) {
     t.error(err)
@@ -128,7 +128,7 @@ test('get localfeed by name across disk loads', function (t) {
 
     // HACK: close its storage
     w._storage.close(function () {
-      var multi2 = multicore(hypercore, storage, { valueEncoding: 'json' })
+      var multi2 = multifeed(hypercore, storage, { valueEncoding: 'json' })
       multi.writer('minuette', function (err, w2) {
         t.error(err)
         t.ok(w.key)
@@ -144,7 +144,7 @@ test('regression test: concurrency of writer creation', function (t) {
   var storage = tmp()
   var key
 
-  var multi = multicore(hypercore, storage, { valueEncoding: 'json' })
+  var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
 
   multi.writer('minuette', function (err, w) {
     t.error(err)
