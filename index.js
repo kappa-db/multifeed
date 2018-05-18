@@ -132,10 +132,10 @@ Multifeed.prototype.replicate = function (opts) {
   if (!opts) opts = {}
 
   var self = this
-  opts.expectedFeeds = Object.keys(this._feeds).length
+  opts.expectedFeeds = Object.keys(this._feeds).length + 1
   var expectedFeeds = opts.expectedFeeds
 
-  opts.download = true
+  opts.encrypt = false
   opts.stream = protocol(opts)
 
   function addMissingKeys (keys) {
@@ -148,7 +148,7 @@ Multifeed.prototype.replicate = function (opts) {
         var storage = self._storage(''+numFeeds)
         var feed = self._hypercore(storage, key, self._opts)
         self._addFeed(feed, String(numFeeds))
-        replicate()
+        feed.replicate(opts)
       }
     })
   }
@@ -181,7 +181,7 @@ Multifeed.prototype.replicate = function (opts) {
 
   if (!opts.live) {
     opts.stream.on('prefinalize', function (cb) {
-      var numFeeds = Object.keys(self._feeds).length
+      var numFeeds = Object.keys(self._feeds).length + 1
       opts.stream.expectedFeeds += (numFeeds - expectedFeeds)
       expectedFeeds = numFeeds
       cb()
@@ -192,19 +192,15 @@ Multifeed.prototype.replicate = function (opts) {
 
   return stream
 
-  function replicate () {
-    Object.values(self._feeds).forEach(function (feed) {
-      feed.replicate(opts)
-    })
-  }
-
   function onready (err) {
     if (err) return stream.destroy(err)
     if (stream.destroyed) return
 
     self._fake.replicate(opts)
 
-    replicate()
+    Object.values(self._feeds).forEach(function (feed) {
+      feed.replicate(opts)
+    })
   }
 }
 
