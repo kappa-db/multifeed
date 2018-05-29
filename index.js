@@ -66,14 +66,16 @@ Multifeed.prototype._loadFeeds = function (cb) {
     st.read(0, 4, function (err) {
       if (err) return cb()
       var feed = self._hypercore(storage, self._opts)
-      readStringFromStorage(storage('localname'), function (err, name) {
-        if (!err && name) {
-          self._addFeed(feed, name)
-        } else {
-          self._addFeed(feed, String(n))
-        }
+      feed.ready(function () {
+        readStringFromStorage(storage('localname'), function (err, name) {
+          if (!err && name) {
+            self._addFeed(feed, name)
+          } else {
+            self._addFeed(feed, String(n))
+          }
+          next(n+1)
+        })
       })
-      next(n+1)
     })
   })(0)
 }
