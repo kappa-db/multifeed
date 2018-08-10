@@ -172,6 +172,10 @@ Multifeed.prototype.replicate = function (opts) {
     if (firstRead) {
       firstRead = false
       var keys = deserializeFeedBuf(buf)
+      if (!Array.isArray(keys)) {
+        // probably replicating with a non-multifeed peer: abort
+        return next(new Error('replicating with non-multifeed peer'))
+      }
       addMissingKeys(keys)
     } else {
       this.push(buf)
