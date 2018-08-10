@@ -246,11 +246,9 @@ function readJsonFromStorage (storage, cb) {
   })
 }
 
-// HACK: This is going to blow up our faces when somebody uses UTF-8 and it's
-// gonna be great. :D
 // TODO: what if the new data is shorter than the old data? things will break!
 function writeStringToStorage (string, storage, cb) {
-  var buf = Buffer.alloc(string.length)
+  var buf = Buffer.from(string, 'utf8')
   storage.write(0, buf, cb)
 }
 
