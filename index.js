@@ -140,19 +140,24 @@ Multifeed.prototype.replicate = function (opts) {
   opts.encrypt = false
   opts.stream = protocol(opts)
 
-  function addMissingKeys (keys) {
+  function addMissingKeys (keys, cb) {
+    var pending = 0
     keys.forEach(function (key) {
       var feeds = Object.values(self._feeds).filter(function (feed) {
         return feed.key.equals(key)
       })
       if (!feeds.length) {
+        pending++
         var numFeeds = Object.keys(self._feeds).length
         var storage = self._storage(''+numFeeds)
         var feed = self._hypercore(storage, key, self._opts)
         self._addFeed(feed, String(numFeeds))
-        feed.replicate(opts)
+        feed.ready(function () {
+          if (!--pending) cb()
+        })
       }
     })
+    if (!pending) cb()
   }
 
   var feedWriteBuf = serializeFeedBuf(Object.values(this._feeds))
@@ -169,18 +174,28 @@ Multifeed.prototype.replicate = function (opts) {
 
   var firstRead = true
   var readStream = through(function (buf, _, next) {
+    var self = this
     if (firstRead) {
       firstRead = false
-      var keys = deserializeFeedBuf(buf)
+      var res = deserializeFeedBuf(buf)
+      var keys = res[0]
+      var size = res[1]
       if (!Array.isArray(keys)) {
         // probably replicating with a non-multifeed peer: abort
         return next(new Error('replicating with non-multifeed peer'))
       }
-      addMissingKeys(keys)
+
+      // push remainder of buffer
+      this.push(buf.slice(size))
+
+      addMissingKeys(keys, function () {
+        startSync()
+        next()
+      })
     } else {
       this.push(buf)
+      next()
     }
-    next()
   })
 
   var stream = pumpify(readStream, opts.stream, writeStream)
@@ -198,15 +213,21 @@ Multifeed.prototype.replicate = function (opts) {
 
   return stream
 
+  function startSync () {
+    var sortedFeeds = Object.values(self._feeds).sort(cmp)
+    function cmp (a, b) {
+      return a.key.toString('hex') < b.key.toString('hex')
+    }
+    sortedFeeds.forEach(function (feed) {
+      feed.replicate(opts)
+    })
+  }
+
   function onready (err) {
     if (err) return stream.destroy(err)
     if (stream.destroyed) return
 
     self._fake.replicate(opts)
-
-    Object.values(self._feeds).forEach(function (feed) {
-      feed.replicate(opts)
-    })
   }
 }
 
@@ -231,7 +252,7 @@ function deserializeFeedBuf (buf) {
     res.push(key)
   }
 
-  return res
+  return [res, 2 + numFeeds * 32]
 }
 
 function writeJsonToStorage (obj, storage, cb) {
