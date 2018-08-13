@@ -113,6 +113,62 @@ test('replicate two multifeeds', function (t) {
   }
 })
 
+test('live replicate two multifeeds', function (t) {
+  t.plan(22)
+
+  var m1 = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })
+
+  var feedEvents1 = 0
+  var feedEvents2 = 0
+  m1.on('feed', function (feed, name) {
+    t.equals(name, String(feedEvents1))
+    feedEvents1++
+  })
+  m2.on('feed', function (feed, name) {
+    t.equals(name, String(feedEvents2))
+    feedEvents2++
+  })
+
+  function setup (m, buf, cb) {
+    m.writer(function (err, w) {
+      t.error(err)
+      w.append(buf, function (err) {
+        t.error(err)
+        w.get(0, function (err, data) {
+          t.error(err)
+          t.equals(data, buf)
+          t.deepEquals(m.feeds(), [w])
+          cb()
+        })
+      })
+    })
+  }
+
+  setup(m1, 'foo', function () {
+    setup(m2, 'bar', function () {
+      var r = m1.replicate({live:true})
+      r.pipe(m2.replicate({live:true})).pipe(r)
+      setTimeout(check, 1000)
+    })
+  })
+
+  function check () {
+    t.equals(m1.feeds().length, 2)
+    t.equals(m2.feeds().length, 2)
+    m1.feeds()[1].get(0, function (err, data) {
+      t.error(err)
+      t.equals(data, 'bar')
+    })
+    m2.feeds()[1].get(0, function (err, data) {
+      t.error(err)
+      t.equals(data, 'foo')
+    })
+    t.equals(feedEvents1, 2)
+    t.equals(feedEvents2, 2)
+  }
+})
+
 test('get localfeed by name across disk loads', function (t) {
   t.plan(5)
 
