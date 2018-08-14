@@ -38,7 +38,6 @@ function Multifeed (hypercore, storage, opts) {
     var publicKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
     var feed = hypercore(self._storage('fake'), publicKey)
     self._fake = feed
-
     self._loadFeeds(done)
   })
 }
@@ -185,11 +184,14 @@ Multifeed.prototype.replicate = function (opts) {
         return next(new Error('replicating with non-multifeed peer'))
       }
 
-      // push remainder of buffer
-      this.push(buf.slice(size))
-
       addMissingKeys(keys, function () {
-        startSync()
+        // push remainder of buffer
+        var leftover = buf.slice(size)
+        self.push(leftover)
+
+        process.nextTick(function () {
+          startSync()
+        })
         next()
       })
     } else {
@@ -216,7 +218,7 @@ Multifeed.prototype.replicate = function (opts) {
   function startSync () {
     var sortedFeeds = Object.values(self._feeds).sort(cmp)
     function cmp (a, b) {
-      return a.key.toString('hex') < b.key.toString('hex')
+      return a.key.toString('hex') > b.key.toString('hex')
     }
     sortedFeeds.forEach(function (feed) {
       feed.replicate(opts)
