@@ -147,13 +147,17 @@ Multifeed.prototype.replicate = function (opts) {
       })
       if (!feeds.length) {
         pending++
-        var numFeeds = Object.keys(self._feeds).length
-        var storage = self._storage(''+numFeeds)
-        var feed = self._hypercore(storage, key, self._opts)
-        self._addFeed(feed, String(numFeeds))
-        feed.ready(function () {
+        try {
+          var numFeeds = Object.keys(self._feeds).length
+          var storage = self._storage(''+numFeeds)
+          var feed = self._hypercore(storage, key, self._opts)
+          self._addFeed(feed, String(numFeeds))
+          feed.ready(function () {
+            if (!--pending) cb()
+          })
+        } catch (e) {
           if (!--pending) cb()
-        })
+        }
       }
     })
     if (!pending) cb()
