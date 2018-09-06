@@ -98,6 +98,8 @@ Create a duplex stream for replication.
 Works just like hypercore, except *all* local hypercores are exchanged between
 replication endpoints.
 
+**Note**: this stream is *not* an encrypted channel.
+
 ### multi.on('feed', function (feed, name) { ... })
 
 Emitted whenever a new feed is added, whether locally or remotely.
