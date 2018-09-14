@@ -154,7 +154,7 @@ Multifeed.prototype.replicate = function (opts) {
         var storage = self._storage(''+numFeeds)
         var feed
         try {
-          feed = self._hypercore(storage, key, self._opts)
+        feed = self._hypercore(storage, key, self._opts)
         } catch (e) {
           if (!--pending) cb()
           return
@@ -258,9 +258,6 @@ function serializeFeedBuf (feeds) {
 }
 
 function deserializeFeedBuf (buf) {
-  // bad msg
-  if ((buf.length - 2) % 32 !== 0) return null
-
   var numFeeds = buf.readUInt16LE(0)
   var res = []
 
