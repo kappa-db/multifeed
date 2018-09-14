@@ -141,23 +141,28 @@ Multifeed.prototype.replicate = function (opts) {
 
   function addMissingKeys (keys, cb) {
     var pending = 0
-    keys.forEach(function (key) {
+    var filtered = keys.filter(function (key) {
+      return Buffer.isBuffer(key) && key.length === 32
+    })
+    filtered.forEach(function (key) {
       var feeds = Object.values(self._feeds).filter(function (feed) {
         return feed.key.equals(key)
       })
       if (!feeds.length) {
         pending++
+        var numFeeds = Object.keys(self._feeds).length
+        var storage = self._storage(''+numFeeds)
+        var feed
         try {
-          var numFeeds = Object.keys(self._feeds).length
-          var storage = self._storage(''+numFeeds)
-          var feed = self._hypercore(storage, key, self._opts)
-          self._addFeed(feed, String(numFeeds))
-          feed.ready(function () {
-            if (!--pending) cb()
-          })
+          feed = self._hypercore(storage, key, self._opts)
         } catch (e) {
           if (!--pending) cb()
+          return
         }
+        self._addFeed(feed, String(numFeeds))
+        feed.ready(function () {
+          if (!--pending) cb()
+        })
       }
     })
     if (!pending) cb()
@@ -181,6 +186,10 @@ Multifeed.prototype.replicate = function (opts) {
     if (firstRead) {
       firstRead = false
       var res = deserializeFeedBuf(buf)
+      if (!res) {
+        // probably replicating with a non-multifeed peer: abort
+        return next(new Error('replicating with non-multifeed peer'))
+      }
       var keys = res[0]
       var size = res[1]
       if (!Array.isArray(keys)) {
@@ -249,6 +258,9 @@ function serializeFeedBuf (feeds) {
 }
 
 function deserializeFeedBuf (buf) {
+  // bad msg
+  if ((buf.length - 2) % 32 !== 0) return null
+
   var numFeeds = buf.readUInt16LE(0)
   var res = []
 
