@@ -86,13 +86,13 @@ Multifeed.prototype.writer = function (name, cb) {
   }
   var self = this
 
-  // Short-circuit if already loaded
-  if (this._feeds[name]) {
-    process.nextTick(cb, null, this._feeds[name])
-    return
-  }
-
   this.ready(function () {
+    // Short-circuit if already loaded
+    if (self._feeds[name]) {
+      process.nextTick(cb, null, self._feeds[name])
+      return
+    }
+
     self.writerLock(function (release) {
       var len = Object.keys(self._feeds).length
       var storage = self._storage(''+len)
