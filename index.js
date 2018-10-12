@@ -7,6 +7,7 @@ var events = require('events')
 var inherits = require('inherits')
 var readyify = require('./ready')
 var mutexify = require('mutexify')
+var debug = require('debug')('multifeed')
 
 module.exports = Multifeed
 
@@ -37,8 +38,13 @@ function Multifeed (hypercore, storage, opts) {
     // replication.
     var publicKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
     var feed = hypercore(self._storage('fake'), publicKey)
-    self._fake = feed
-    self._loadFeeds(done)
+    feed.ready(function () {
+      self._fake = feed
+      self._loadFeeds(function () {
+        debug('[INIT] finished loading feeds')
+        done()
+      })
+    })
   })
 }
 
@@ -59,7 +65,8 @@ Multifeed.prototype._loadFeeds = function (cb) {
 
   // Hypercores are stored starting at 0 and incrementing by 1. A failed read
   // at position 0 implies non-existance of the hypercore.
-  ;(function next (n) {
+  function next (n) {
+    debug('[INIT] loading feed #' + n)
     var storage = self._storage(''+n)
     var st = storage('key')
     st.read(0, 4, function (err) {
@@ -76,7 +83,9 @@ Multifeed.prototype._loadFeeds = function (cb) {
         })
       })
     })
-  })(0)
+  }
+
+  next(0)
 }
 
 Multifeed.prototype.writer = function (name, cb) {
@@ -92,6 +101,8 @@ Multifeed.prototype.writer = function (name, cb) {
       process.nextTick(cb, null, self._feeds[name])
       return
     }
+
+    debug('[WRITER] creating new writer: ' + name)
 
     self.writerLock(function (release) {
       var len = Object.keys(self._feeds).length
@@ -141,6 +152,7 @@ Multifeed.prototype.replicate = function (opts) {
 
   function addMissingKeys (keys, cb) {
     var pending = 0
+    debug('[REPLICATION] recv\'d ' + keys.length + ' keys')
     var filtered = keys.filter(function (key) {
       return Buffer.isBuffer(key) && key.length === 32
     })
@@ -154,11 +166,14 @@ Multifeed.prototype.replicate = function (opts) {
         var storage = self._storage(''+numFeeds)
         var feed
         try {
-        feed = self._hypercore(storage, key, self._opts)
+          debug('[REPLICATION] trying to create new local hypercore, key=' + key.toString('hex'))
+          feed = self._hypercore(storage, key, self._opts)
         } catch (e) {
+          debug('[REPLICATION] failed to create new local hypercore, key=' + key.toString('hex'))
           if (!--pending) cb()
           return
         }
+        debug('[REPLICATION] succeeded in creating new local hypercore, key=' + key.toString('hex'))
         self._addFeed(feed, String(numFeeds))
         feed.ready(function () {
           if (!--pending) cb()
@@ -168,6 +183,7 @@ Multifeed.prototype.replicate = function (opts) {
     if (!pending) cb()
   }
 
+  debug('[REPLICATION] able to share ' + Object.values(this._feeds).length + ' keys')
   var feedWriteBuf = serializeFeedBuf(Object.values(this._feeds))
 
   var firstWrite = true
@@ -234,6 +250,7 @@ Multifeed.prototype.replicate = function (opts) {
       return a.key.toString('hex') > b.key.toString('hex')
     }
     sortedFeeds.forEach(function (feed) {
+      debug('[REPLICATION] replicating ' + feed.key.toString('hex'))
       feed.replicate(opts)
     })
   }
