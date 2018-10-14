@@ -277,6 +277,7 @@ function serializeHeader (version, keys) {
     keys: keys
   }
   var json = JSON.stringify(header)
+  debug('[SERIALIZE] header outgoing: ' + json)
   var lenBuf = Buffer.alloc(4)
   lenBuf.writeUInt32LE(json.length, 0)
   var jsonBuf = Buffer.from(json, 'utf8')
@@ -288,7 +289,9 @@ function serializeHeader (version, keys) {
 
 function deserializeHeader (buf) {
   var len = buf.readUInt32LE(0)
-  var jsonBuf = buf.slice(4)
+  debug('[SERIALIZE] header len to read: ' + len)
+  var jsonBuf = buf.slice(4, len + 4)
+  debug('[SERIALIZE] json buf to read: ' + jsonBuf.toString())
   try {
     var header = JSON.parse(jsonBuf.toString('utf8'))
     return header
