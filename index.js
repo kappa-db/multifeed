@@ -9,6 +9,8 @@ var readyify = require('./ready')
 var mutexify = require('mutexify')
 var debug = require('debug')('multifeed')
 
+PROTOCOL_VERSION = '1.0.0'
+
 module.exports = Multifeed
 
 function Multifeed (hypercore, storage, opts) {
@@ -154,11 +156,11 @@ Multifeed.prototype.replicate = function (opts) {
     var pending = 0
     debug('[REPLICATION] recv\'d ' + keys.length + ' keys')
     var filtered = keys.filter(function (key) {
-      return Buffer.isBuffer(key) && key.length === 32
+      return !Number.isNaN(parseInt(key, 16)) && key.length === 64
     })
     filtered.forEach(function (key) {
       var feeds = Object.values(self._feeds).filter(function (feed) {
-        return feed.key.equals(key)
+        return feed.key.toString('hex') === key
       })
       if (!feeds.length) {
         pending++
@@ -167,7 +169,7 @@ Multifeed.prototype.replicate = function (opts) {
         var feed
         try {
           debug('[REPLICATION] trying to create new local hypercore, key=' + key.toString('hex'))
-          feed = self._hypercore(storage, key, self._opts)
+          feed = self._hypercore(storage, Buffer.from(key, 'hex'), self._opts)
         } catch (e) {
           debug('[REPLICATION] failed to create new local hypercore, key=' + key.toString('hex'))
           if (!--pending) cb()
@@ -183,46 +185,52 @@ Multifeed.prototype.replicate = function (opts) {
     if (!pending) cb()
   }
 
-  debug('[REPLICATION] able to share ' + Object.values(this._feeds).length + ' keys')
-  var feedWriteBuf = serializeFeedBuf(Object.values(this._feeds))
-
   var firstWrite = true
   var writeStream = through(function (buf, _, next) {
     if (firstWrite) {
       firstWrite = false
-      this.push(feedWriteBuf)
+      debug('[REPLICATION] able to share ' + Object.values(self._feeds).length + ' keys')
+      var keys = Object.values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
+      var headerBuf = serializeHeader(PROTOCOL_VERSION, keys)
+      this.push(headerBuf)
     }
     this.push(buf)
     next()
   })
 
-  var firstRead = true
+  var readingHeader = true
+  var headerAccum = Buffer.alloc(0)
   var readStream = through(function (buf, _, next) {
     var self = this
-    if (firstRead) {
-      firstRead = false
-      var res = deserializeFeedBuf(buf)
-      if (!res) {
-        // probably replicating with a non-multifeed peer: abort
-        return next(new Error('replicating with non-multifeed peer'))
-      }
-      var keys = res[0]
-      var size = res[1]
-      if (!Array.isArray(keys)) {
-        // probably replicating with a non-multifeed peer: abort
-        return next(new Error('replicating with non-multifeed peer'))
-      }
-
-      addMissingKeys(keys, function () {
-        // push remainder of buffer
-        var leftover = buf.slice(size)
-        self.push(leftover)
-
-        process.nextTick(function () {
-          startSync()
-        })
+    if (readingHeader) {
+      headerAccum = Buffer.concat([headerAccum, buf])
+      var expectedLen = headerAccum.readUInt32LE(0)
+      if (headerAccum.length >= expectedLen + 4) {
+        readingHeader = false
+        try {
+          var header = deserializeHeader(buf)
+          debug('[REPLICATION] recv\'d header: ' + JSON.stringify(header))
+          if (!compatibleVersions(header.version, PROTOCOL_VERSION)) {
+            debug('[REPLICATION] aborting; version mismatch (us='+PROTOCOL_VERSION+')')
+            self.emit('error', new Error('protocol version mismatch! us='+PROTOCOL_VERSION + ' them=' + header.version))
+            return
+          }
+          addMissingKeys(header.keys, function () {
+            // push remainder of buffer
+            var leftover = buf.slice(expectedLen + 4)
+            self.push(leftover)
+            debug('[REPLICATION] starting hypercore replication')
+            process.nextTick(startSync)
+            next()
+          })
+        } catch (e) {
+          debug('[REPLICATION] aborting (bad header)')
+          self.emit('error', e)
+          return
+        }
+      } else {
         next()
-      })
+      }
     } else {
       this.push(buf)
       next()
@@ -263,28 +271,31 @@ Multifeed.prototype.replicate = function (opts) {
   }
 }
 
-function serializeFeedBuf (feeds) {
-  var myFeedKeys = feeds.map(function (feed) {
-    return feed.key
-  })
-
-  var numFeedsBuf = Buffer.alloc(2)
-  numFeedsBuf.writeUInt16LE(myFeedKeys.length, 0)
-
-  return Buffer.concat([numFeedsBuf].concat(myFeedKeys))
+function serializeHeader (version, keys) {
+  var header = {
+    version: version,
+    keys: keys
+  }
+  var json = JSON.stringify(header)
+  var lenBuf = Buffer.alloc(4)
+  lenBuf.writeUInt32LE(json.length, 0)
+  var jsonBuf = Buffer.from(json, 'utf8')
+  return Buffer.concat([
+    lenBuf,
+    jsonBuf
+  ])
 }
 
-function deserializeFeedBuf (buf) {
-  var numFeeds = buf.readUInt16LE(0)
-  var res = []
-
-  for (var i=0; i < numFeeds; i++) {
-    var offset = 2 + i * 32
-    var key = buf.slice(offset, offset + 32)
-    res.push(key)
+function deserializeHeader (buf) {
+  var len = buf.readUInt32LE(0)
+  var jsonBuf = buf.slice(4)
+  try {
+    var header = JSON.parse(jsonBuf.toString('utf8'))
+    return header
+    return header
+  } catch (e) {
+    return new Error('failed to parse header')
   }
-
-  return [res, 2 + numFeeds * 32]
 }
 
 function writeJsonToStorage (obj, storage, cb) {
@@ -319,4 +330,11 @@ function readStringFromStorage (storage, cb) {
       cb(null, str)
     })
   })
+}
+
+// String, String -> Boolean
+function compatibleVersions (v1, v2) {
+  var major1 = v1.split('.')[0]
+  var major2 = v2.split('.')[0]
+  return parseInt(major1) === parseInt(major2)
 }
