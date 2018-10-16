@@ -204,6 +204,7 @@ Multifeed.prototype.replicate = function (opts) {
     var self = this
     if (readingHeader) {
       headerAccum = Buffer.concat([headerAccum, buf])
+      if (headerAccum.length <= 0) return next()
       var expectedLen = headerAccum.readUInt32LE(0)
       if (headerAccum.length >= expectedLen + 4) {
         readingHeader = false
