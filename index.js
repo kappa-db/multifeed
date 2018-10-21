@@ -209,7 +209,7 @@ Multifeed.prototype.replicate = function (opts) {
       if (headerAccum.length >= expectedLen + 4) {
         readingHeader = false
         try {
-          var header = deserializeHeader(buf)
+          var header = deserializeHeader(headerAccum)
           debug('[REPLICATION] recv\'d header: ' + JSON.stringify(header))
           if (!compatibleVersions(header.version, PROTOCOL_VERSION)) {
             debug('[REPLICATION] aborting; version mismatch (us='+PROTOCOL_VERSION+')')
@@ -218,7 +218,7 @@ Multifeed.prototype.replicate = function (opts) {
           }
           addMissingKeys(header.keys, function () {
             // push remainder of buffer
-            var leftover = buf.slice(expectedLen + 4)
+            var leftover = headerAccum.slice(expectedLen + 4)
             self.push(leftover)
             debug('[REPLICATION] starting hypercore replication')
             process.nextTick(startSync)
