@@ -19,14 +19,14 @@ var multi = multifeed(hypercore, './db', { valueEncoding: 'json' })
 console.log(multi.feeds().length)             // => 0
 
 // create as many writeable feeds as you want; returns hypercores
-multi.writer(function (err, w) {
+multi.writer('local', function (err, w) {
   console.log(w.key, w.writeable, w.readable)   // => Buffer <0x..> true true
   console.log(multi.feeds().length)             // => 1
 
   // write data to any writeable feed, just like with hypercore
   w.append('foo', function () {
     var m2 = multifeed(ram, { valueEncoding: 'json' })
-    m2.writer(function (err, w2) {
+    m2.writer('local', function (err, w2) {
       w2.append('bar', function () {
         replicate(multi, m2, function () {
           console.log(m2.feeds().length)        // => 2
