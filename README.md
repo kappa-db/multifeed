@@ -25,7 +25,7 @@ multi.writer('local', function (err, w) {
 
   // write data to any writeable feed, just like with hypercore
   w.append('foo', function () {
-    var m2 = multifeed(ram, { valueEncoding: 'json' })
+    var m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })
     m2.writer('local', function (err, w2) {
       w2.append('bar', function () {
         replicate(multi, m2, function () {
