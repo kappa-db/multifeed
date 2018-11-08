@@ -9,7 +9,7 @@ var readyify = require('./ready')
 var mutexify = require('mutexify')
 var debug = require('debug')('multifeed')
 
-PROTOCOL_VERSION = '1.0.0'
+var PROTOCOL_VERSION = '1.0.0'
 
 module.exports = Multifeed
 
