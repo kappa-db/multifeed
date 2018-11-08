@@ -293,13 +293,7 @@ function deserializeHeader (buf) {
   debug('[SERIALIZE] header len to read: ' + len)
   var jsonBuf = buf.slice(4, len + 4)
   debug('[SERIALIZE] json buf to read: ' + jsonBuf.toString())
-  try {
-    var header = JSON.parse(jsonBuf.toString('utf8'))
-    return header
-    return header
-  } catch (e) {
-    return new Error('failed to parse header')
-  }
+  return JSON.parse(jsonBuf.toString('utf8'))
 }
 
 function writeJsonToStorage (obj, storage, cb) {
