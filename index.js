@@ -219,7 +219,7 @@ Multifeed.prototype.replicate = function (opts) {
           addMissingKeys(header.keys, function () {
             // push remainder of buffer
             var leftover = headerAccum.slice(expectedLen + 4)
-            self.push(leftover)
+            self.unshift(leftover)
             debug('[REPLICATION] starting hypercore replication')
             process.nextTick(startSync)
             next()
