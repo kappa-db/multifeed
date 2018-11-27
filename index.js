@@ -153,6 +153,17 @@ Multifeed.prototype.replicate = function (opts) {
   opts.stream = protocol(opts)
 
   function addMissingKeys (keys, cb) {
+    self.ready(function (err) {
+      if (err) return cb(err)
+      self.writerLock(function (release) {
+        addMissingKeysLocked(keys, function (err) {
+          release(cb, err)
+        })
+      })
+    })
+  }
+  
+  function addMissingKeysLocked (keys, cb) {
     var pending = 0
     debug('[REPLICATION] recv\'d ' + keys.length + ' keys')
     var filtered = keys.filter(function (key) {
