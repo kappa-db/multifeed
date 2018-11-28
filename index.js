@@ -133,7 +133,7 @@ Multifeed.prototype.writer = function (name, cb) {
 }
 
 Multifeed.prototype.feeds = function () {
-  return Object.values(this._feeds)
+  return values(this._feeds)
 }
 
 Multifeed.prototype.feed = function (key) {
@@ -170,7 +170,7 @@ Multifeed.prototype.replicate = function (opts) {
       return !Number.isNaN(parseInt(key, 16)) && key.length === 64
     })
     filtered.forEach(function (key) {
-      var feeds = Object.values(self._feeds).filter(function (feed) {
+      var feeds = values(self._feeds).filter(function (feed) {
         return feed.key.toString('hex') === key
       })
       if (!feeds.length) {
@@ -200,8 +200,8 @@ Multifeed.prototype.replicate = function (opts) {
   var writeStream = through(function (buf, _, next) {
     if (firstWrite) {
       firstWrite = false
-      debug('[REPLICATION] able to share ' + Object.values(self._feeds).length + ' keys')
-      var keys = Object.values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
+      debug('[REPLICATION] able to share ' + values(self._feeds).length + ' keys')
+      var keys = values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
       var headerBuf = serializeHeader(PROTOCOL_VERSION, keys)
       this.push(headerBuf)
     }
@@ -265,7 +265,7 @@ Multifeed.prototype.replicate = function (opts) {
   return stream
 
   function startSync () {
-    var sortedFeeds = Object.values(self._feeds).sort(cmp)
+    var sortedFeeds = values(self._feeds).sort(cmp)
     function cmp (a, b) {
       return a.key.toString('hex') > b.key.toString('hex')
     }
@@ -347,3 +347,8 @@ function compatibleVersions (v1, v2) {
   var major2 = v2.split('.')[0]
   return parseInt(major1) === parseInt(major2)
 }
+
+function values (obj) {
+  return Object.keys(obj).map(function (k) { return obj[k] })
+}
+
