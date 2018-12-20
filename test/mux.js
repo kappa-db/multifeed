@@ -7,7 +7,7 @@ var through = require('through2')
 var debug = require('debug')('multifeed/protodump')
 
 test('Key exchange API', function(t){
-  t.plan(19)
+  t.plan(11)
   var encryptionKey = Buffer.from('deadbeefdeadbeefdeadbeefdeadbeef') // used to encrypt the connection
 
   var mux1 = multiplexer(encryptionKey, {live: true})
@@ -37,8 +37,7 @@ test('Key exchange API', function(t){
     mux1.on('replicate', function(keys, repl) {
       // Keys should be alphabetically sorted
       // and identical on both ends.
-      for (var i = 0; i < Math.max(keys.length, expectedKeys.length); i++)
-        t.equal(keys[i], expectedKeys[i], 'Mux1 Repl key order ' + keys[i])
+      t.deepEqual(keys, expectedKeys, 'Mux1 replicating same keys')
       t.equal(typeof repl, 'function')
     })
 
@@ -49,8 +48,7 @@ test('Key exchange API', function(t){
     t.equal(m.keys[0], 'foo')
     t.equal(m.keys[1], 'oof')
     mux2.on('replicate', function(keys, repl) {
-      for (var i = 0; i < Math.max(keys.length, expectedKeys.length); i++)
-        t.equal(keys[i], expectedKeys[i], 'Mux2 Repl key order ' + keys[i])
+      t.deepEqual(keys, expectedKeys, 'Mux2 replicating same keys')
       t.equal(typeof repl, 'function')
     })
 
@@ -59,25 +57,25 @@ test('Key exchange API', function(t){
 
 
   pump(
-    mux1.stream(),
+    mux1.stream,
     through(function(chunk, _, next) {
       debug("MUX1->MUX2", chunk.toString('utf8'))
       this.push(chunk)
       next()
     }),
-    mux2.stream(),
+    mux2.stream,
     through(function(chunk, _, next) {
       debug("MUX2->MUX1", chunk.toString('utf8'))
       this.push(chunk)
       next()
     }),
-    mux1.stream()
+    mux1.stream
   )
 
 })
 
 test('Actual replication', function(t) {
-  t.plan(9)
+  t.plan(28)
   var encryptionKey = Buffer.from('deadbeefdeadbeefdeadbeefdeadbeef') 
   var h1 = hypercore(ram)
   var h2 = hypercore(ram)
@@ -103,23 +101,28 @@ test('Actual replication', function(t) {
     })
   }
 
-  var mux1 = multiplexer(encryptionKey, {live: true})
-  var mux2 = multiplexer(encryptionKey, {live: true})
-
+  var mux1 = multiplexer(encryptionKey)
+  var mux2 = multiplexer(encryptionKey)
+  // replicated core placeholders
+  var h1r = null
+  var h2r = null
+  var h3r = null
   mux1.on('manifest', function(m){
-    var r = hypercore(ram, h2.key.toString('hex'))
-    r.on('download',function(index, data){
+    h2r = hypercore(ram, h2.key.toString('hex'))
+    h2r.on('download',function(index, data){
       t.equal(data.toString('utf8'), 'sea', 'h2 repl')
       t.equal(index, 0)
     })
 
-    var r2 = hypercore(ram, h3.key.toString('hex'))
-    r2.on('download',function(index, data){
+    h3r = hypercore(ram, h3.key.toString('hex'))
+    h3r.on('download',function(index, data){
       t.equal(data.toString('utf8'), 'late to the party', 'h3 repl')
       t.equal(index, 0)
     })
+
     mux1.on('replicate', function(keys, repl) {
-      repl([r, h1, r2])
+      t.deepEqual(keys, [h1,h2,h3].map(function(f) { return f.key.toString('hex')}).sort(), 'Mux1 replicating same keys')
+      repl([h2r, h1, h3r])
     })
     mux1.wantFeeds(m.keys)
   })
@@ -131,6 +134,7 @@ test('Actual replication', function(t) {
       t.equal(index, 0)
     })
     mux2.on('replicate', function(keys, repl) {
+      t.deepEqual(keys, [h1,h2,h3].map(function(f) { return f.key.toString('hex')}).sort(), 'Mux2 replicating same keys')
       repl([r, h2, h3])
     })
     mux2.wantFeeds(m.keys)
@@ -146,19 +150,35 @@ test('Actual replication', function(t) {
     })
   })
 
-  pump(
-    mux1.stream(),
-    through(function(chunk, _, next) {
+  mux1.stream
+    .pipe(through(function(chunk, _, next) {
       debug("MUX1->MUX2", chunk.toString('utf8'))
       this.push(chunk)
       next()
-    }),
-    mux2.stream(),
-    through(function(chunk, _, next) {
+    }))
+    .pipe(mux2.stream)
+    .pipe(through(function(chunk, _, next) {
       debug("MUX2->MUX1", chunk.toString('utf8'))
       this.push(chunk)
       next()
-    }),
-    mux1.stream()
-  )
+    }))
+    .pipe(mux1.stream)
+    .once('end', function(err){
+      debugger
+      t.error(err)
+      h1r.get(0, function (err, data) {
+        t.error(err)
+        t.equals(data, 'hyper', 'core 1 repl success!')
+      })
+
+      h2r.get(0, function (err, data) {
+        t.error(err)
+        t.equals(data, 'sea', 'core 2 repl success!')
+      })
+
+      h3r.get(0, function (err, data) {
+        t.error(err)
+        t.equals(data, 'late to the party', 'core 3 repl success!')
+      })
+    })
 })

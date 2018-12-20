@@ -255,13 +255,13 @@ Multifeed.prototype.replicate = function (opts) {
   var mux = multiplexer(self._fake.key, opts)
 
   // Add key exchange listener
-  mux.on('manifest', function(m) {
+  mux.once('manifest', function(m) {
     let filtered = self._filterSignedKeys(m.keys, m.signatures)
     mux.wantFeeds(filtered)
   })
 
   // Add replication listener
-  mux.on('replicate', function(keys, repl) {
+  mux.once('replicate', function(keys, repl) {
     addMissingKeys(keys, function(err){
       if(err) return mux.destroy(err)
 
@@ -273,16 +273,6 @@ Multifeed.prototype.replicate = function (opts) {
       repl(sortedFeeds)
     })
   })
-
-  // Setup live handling
-  if (!opts.live) {
-    mux.stream.on('prefinalize', function (cb) {
-      var numFeeds = Object.keys(self._feeds).length + 1
-      mux.stream.expectedFeeds += (numFeeds - expectedFeeds)
-      expectedFeeds = numFeeds
-      cb()
-    })
-  }
 
   // Start streaming
   this.ready(function(err){
