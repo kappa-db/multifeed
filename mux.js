@@ -37,7 +37,7 @@ function Multiplexer (key, opts) {
   self._remoteHas = null
   self._remoteWants = null
 
-  var stream = this._stream = protocol(Object.assign(opts,{
+  var stream = this.stream = protocol(Object.assign(opts,{
     userData: Buffer.from(JSON.stringify({
       client: MULTIFEED,
       version: PROTOCOL_VERSION,
@@ -94,10 +94,6 @@ Multiplexer.prototype.ready = function(cb) {
   this._ready(cb)
 }
 
-Multiplexer.prototype.stream = function (){
-  return this._stream
-}
-
 Multiplexer.prototype.haveFeeds = function (keys, opts) {
   var manifest = xtend(opts || {}, {
     keys: extractKeys(keys)
@@ -142,7 +138,7 @@ Multiplexer.prototype._initRepl = function() {
     feeds.forEach(function(feed) {
       feed.replicate(xtend({}, self._opts, {
         expectedFeeds: keys.length + 1,
-        stream: self._stream
+        stream: self.stream
       }))
     })
   }

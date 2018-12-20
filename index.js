@@ -9,7 +9,7 @@ var readyify = require('./ready')
 var mutexify = require('mutexify')
 var crypto = require('hypercore-crypto')
 var debug = require('debug')('multifeed')
-var multiplex = require('./multiplex')
+var multiplexer = require('./mux')
 
 var PROTOCOL_VERSION = '2.0.0'
 var FEED_SIGNATURES_JSON = 'feed_signatures.json'
@@ -240,6 +240,7 @@ Multifeed.prototype._setFeedSig = function (key, sig, cb) {
 }
 
 Multifeed.prototype._filterSignedKeys = function(keys, signatures) {
+  if(!this._restrictedMode) return keys // Perform no signature filtering
   var self = this
   return keys.filter(function(key) {
     let sig = signatures[key] || self._signatures[key]
@@ -251,17 +252,53 @@ Multifeed.prototype._filterSignedKeys = function(keys, signatures) {
 Multifeed.prototype.replicate = function (opts) {
   if (!opts) opts = {}
   var self = this
-  var mux = multiplex()
-}
-Multifeed.prototype.__old_replicate = function (opts) {
-  if (!opts) opts = {}
+  var mux = multiplexer(self._fake.key, opts)
 
-  var self = this
-  opts.expectedFeeds = Object.keys(this._feeds).length + 1
-  var expectedFeeds = opts.expectedFeeds
+  // Add key exchange listener
+  mux.on('manifest', function(m) {
+    let filtered = self._filterSignedKeys(m.keys, m.signatures)
+    mux.wantFeeds(filtered)
+  })
 
-  opts.encrypt = false
-  opts.stream = protocol(opts)
+  // Add replication listener
+  mux.on('replicate', function(keys, repl) {
+    addMissingKeys(keys, function(err){
+      if(err) return mux.destroy(err)
+
+      var key2feed = values(self._feeds).reduce(function(h,feed){
+        h[feed.key.toString('hex')] = feed
+        return h
+      },{})
+      var sortedFeeds = keys.map(function(k){ return key2feed[k] })
+      repl(sortedFeeds)
+    })
+  })
+
+  // Setup live handling
+  if (!opts.live) {
+    mux.stream.on('prefinalize', function (cb) {
+      var numFeeds = Object.keys(self._feeds).length + 1
+      mux.stream.expectedFeeds += (numFeeds - expectedFeeds)
+      expectedFeeds = numFeeds
+      cb()
+    })
+  }
+
+  // Start streaming
+  this.ready(function(err){
+    if (err) return mux.stream.destroy(err)
+    if (mux.stream.destroyed) return
+    mux.ready(function(){
+      var keys = values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
+      var extras = {}
+      if (this._signatures) extras.signatures = this._signatures
+      mux.haveFeeds(keys, extras)
+    })
+  })
+
+  return mux.stream
+
+  // Helper functions
 
   function addMissingKeys (keys, cb) {
     self.ready(function (err) {
@@ -290,7 +327,6 @@ Multifeed.prototype.__old_replicate = function (opts) {
         var storage = self._storage(''+numFeeds)
         var feed
         try {
-          debugger
           debug('[REPLICATION] trying to create new local hypercore, key=' + key.toString('hex'))
           feed = self._hypercore(storage, Buffer.from(key, 'hex'), self._opts)
         } catch (e) {
@@ -307,131 +343,6 @@ Multifeed.prototype.__old_replicate = function (opts) {
     })
     if (!pending) cb()
   }
-  
-  // ------------------ rewrite
-
-  var firstWrite = true
-  var writeStream = through(function (buf, _, next) {
-    if (firstWrite) {
-      firstWrite = false
-      debug('[REPLICATION] able to share ' + values(self._feeds).length + ' keys')
-      var keys = values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
-      var headerBuf = serializeHeader(PROTOCOL_VERSION, keys, self._signatures)
-      this.push(headerBuf)
-    }
-    // Pass traffic through to next stream
-    this.push(buf)
-    next()
-  })
-
-  var readingHeader = true
-  var headerAccum = Buffer.alloc(0)
-
-  var selfMultifeed = this
-  var readStream = through(function (buf, _, next) {
-    var self = this
-    if (readingHeader) {
-      headerAccum = Buffer.concat([headerAccum, buf])
-      if (headerAccum.length <= 0) return next()
-      var expectedLen = headerAccum.readUInt32LE(0)
-      if (headerAccum.length >= expectedLen + 4) {
-        readingHeader = false
-        try {
-          var header = deserializeHeader(headerAccum)
-          debug('[REPLICATION] recv\'d header: ' + JSON.stringify(header))
-          if (!compatibleVersions(header.version, PROTOCOL_VERSION)) {
-            debug('[REPLICATION] aborting; version mismatch (us='+PROTOCOL_VERSION+')')
-            self.emit('error', new Error('protocol version mismatch! us='+PROTOCOL_VERSION + ' them=' + header.version))
-            return
-          }
-
-          var keys = header.keys
-          if (selfMultifeed._restrictedMode) { // limit replication to verified keys
-            keys = selfMultifeed._filterSignedKeys(keys, header.signatures)
-          }
-
-          addMissingKeys(keys, function () {
-            // push remainder of buffer
-            var leftover = headerAccum.slice(expectedLen + 4)
-            self.unshift(leftover)
-            debug('[REPLICATION] starting hypercore replication')
-            debugger
-            process.nextTick(startSync)
-            next()
-          })
-        } catch (e) {
-          debug('[REPLICATION] aborting (bad header)')
-          self.emit('error', e)
-          return
-        }
-      } else {
-        next()
-      }
-    } else {
-      this.push(buf)
-      next()
-    }
-  })
-
-  var stream = pumpify(readStream, opts.stream, writeStream)
-
-  if (!opts.live) {
-    opts.stream.on('prefinalize', function (cb) {
-      var numFeeds = Object.keys(self._feeds).length + 1
-      opts.stream.expectedFeeds += (numFeeds - expectedFeeds)
-      expectedFeeds = numFeeds
-      cb()
-    })
-  }
-
-  this.ready(onready)
-
-  return stream
-
-  function startSync () {
-    var sortedFeeds = values(self._feeds).sort(cmp)
-    function cmp (a, b) {
-      return a.key.toString('hex') > b.key.toString('hex')
-    }
-    sortedFeeds.forEach(function (feed) {
-      debug('[REPLICATION] replicating ' + feed.key.toString('hex'))
-      debugger
-      feed.replicate(opts)
-    })
-  }
-
-  function onready (err) {
-    if (err) return stream.destroy(err)
-    if (stream.destroyed) return
-
-    self._fake.replicate(opts)
-  }
-} // End of replicate
-
-function serializeHeader (version, keys, signatures) {
-  var header = {
-    version: version,
-    keys: keys
-  }
-  if (signatures) header.signatures = signatures
-
-  var json = JSON.stringify(header)
-  debug('[SERIALIZE] header outgoing: ' + json)
-  var lenBuf = Buffer.alloc(4)
-  lenBuf.writeUInt32LE(json.length, 0)
-  var jsonBuf = Buffer.from(json, 'utf8')
-  return Buffer.concat([
-    lenBuf,
-    jsonBuf
-  ])
-}
-
-function deserializeHeader (buf) {
-  var len = buf.readUInt32LE(0)
-  debug('[SERIALIZE] header len to read: ' + len)
-  var jsonBuf = buf.slice(4, len + 4)
-  debug('[SERIALIZE] json buf to read: ' + jsonBuf.toString())
-  return JSON.parse(jsonBuf.toString('utf8'))
 }
 
 function writeJsonToStorage (obj, storage, cb) {
