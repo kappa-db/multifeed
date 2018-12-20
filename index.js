@@ -9,6 +9,7 @@ var readyify = require('./ready')
 var mutexify = require('mutexify')
 var crypto = require('hypercore-crypto')
 var debug = require('debug')('multifeed')
+var multiplex = require('./multiplex')
 
 var PROTOCOL_VERSION = '2.0.0'
 var FEED_SIGNATURES_JSON = 'feed_signatures.json'
@@ -24,7 +25,9 @@ function Multifeed (hypercore, storage, opts) {
   this._opts = opts
 
   this.writerLock = mutexify()
-  this._restrictedMode = !!opts.restricted
+  this._restrictedMode = !!this._opts.restricted
+  delete this._opts.restricted
+
   if (this._restrictedMode) {
     this._signatures = {}
     if (typeof storage === 'string') this._sigStore = raf(path.join(storage, FEED_SIGNATURES_JSON))
@@ -247,6 +250,11 @@ Multifeed.prototype._filterSignedKeys = function(keys, signatures) {
 
 Multifeed.prototype.replicate = function (opts) {
   if (!opts) opts = {}
+  var self = this
+  var mux = multiplex()
+}
+Multifeed.prototype.__old_replicate = function (opts) {
+  if (!opts) opts = {}
 
   var self = this
   opts.expectedFeeds = Object.keys(this._feeds).length + 1
@@ -282,6 +290,7 @@ Multifeed.prototype.replicate = function (opts) {
         var storage = self._storage(''+numFeeds)
         var feed
         try {
+          debugger
           debug('[REPLICATION] trying to create new local hypercore, key=' + key.toString('hex'))
           feed = self._hypercore(storage, Buffer.from(key, 'hex'), self._opts)
         } catch (e) {
@@ -298,6 +307,8 @@ Multifeed.prototype.replicate = function (opts) {
     })
     if (!pending) cb()
   }
+  
+  // ------------------ rewrite
 
   var firstWrite = true
   var writeStream = through(function (buf, _, next) {
@@ -308,6 +319,7 @@ Multifeed.prototype.replicate = function (opts) {
       var headerBuf = serializeHeader(PROTOCOL_VERSION, keys, self._signatures)
       this.push(headerBuf)
     }
+    // Pass traffic through to next stream
     this.push(buf)
     next()
   })
@@ -456,12 +468,6 @@ function readStringFromStorage (storage, cb) {
   })
 }
 
-// String, String -> Boolean
-function compatibleVersions (v1, v2) {
-  var major1 = v1.split('.')[0]
-  var major2 = v2.split('.')[0]
-  return parseInt(major1) === parseInt(major2)
-}
 
 function values (obj) {
   return Object.keys(obj).map(function (k) { return obj[k] })
