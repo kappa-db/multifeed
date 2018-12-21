@@ -89,15 +89,9 @@ function Multiplexer (key, opts) {
     }
   })
 
-  // When not doing live-replication (keeping stream open for future appends)
-  // Help hyper-proto to figure out when all cores have finished replicating,
-  // so it can safely close the stream and notify all pipes: "we're done lads, good job!"
-  if (!self._opts.live && false) {
-    stream.on('prefinalize', function (cb) {
-      debugger
-      var numFeeds = Object.keys(self._feeds).length + 1
-      mux.stream.expectedFeeds += (numFeeds - expectedFeeds)
-      expectedFeeds = numFeeds
+  if (!self._opts.live ) {
+    self.stream.on('prefinalize', function(cb){
+      debug('[REPLICATION] feed finish/prefinalize', self.stream.expectedFeeds)
       cb()
     })
   }
@@ -192,11 +186,13 @@ Multiplexer.prototype._initRepl = function() {
   if (!this._opts.live && keys.length === 0) return this._finalize()
 
   this.emit('replicate',  keys, startFeedReplication)
-  self.stream.expectedFeeds = receiving.length
+
   return keys
 
   function startFeedReplication(feeds){
     if (!Array.isArray(feeds)) feeds = [feeds]
+    self.stream.expectedFeeds = feeds.length
+
     // only the feeds passed to `feeds` option will be replicated (sent or received)
     // hypercore-protocol has built in protection against receiving unexpected/not asked for data.
     feeds.forEach(function(feed) {
@@ -204,7 +200,6 @@ Multiplexer.prototype._initRepl = function() {
       feed.replicate(xtend({}, self._opts, {
         stream: self.stream
       }))
-      self.stream.expectedFeeds++
     })
   }
 }

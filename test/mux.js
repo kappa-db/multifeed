@@ -10,8 +10,8 @@ test('Key exchange API', function(t){
   t.plan(11)
   var encryptionKey = Buffer.from('deadbeefdeadbeefdeadbeefdeadbeef') // used to encrypt the connection
 
-  var mux1 = multiplexer(encryptionKey, {live: true})
-  var mux2 = multiplexer(encryptionKey, {live: true})
+  var mux1 = multiplexer(encryptionKey)
+  var mux2 = multiplexer(encryptionKey)
 
   mux1.ready(function(client){
     mux1.haveFeeds(['foo', 'oof', '03', '01'])
