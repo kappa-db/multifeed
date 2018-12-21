@@ -224,11 +224,14 @@ Multifeed.prototype._loadSignatures = function (done) {
 Multifeed.prototype._setFeedSig = function (key, sig, cb) {
   if (Buffer.isBuffer(key)) key = key.toString('hex')
   if (Buffer.isBuffer(sig)) sig = sig.toString('hex')
+  this._signatures = this._signatures || {}
+  this._signatures[key] = sig
+  this._persistSignatures(cb)
+}
 
+Multifeed.prototype._persistSignatures = function(cb) {
+  this._signatures = this._signatures || {}
   var self = this
-  self._signatures = self._signatures || {}
-
-  self._signatures[key] = sig
   var sigBuf = Buffer.from(JSON.stringify(self._signatures))
   var sizeBuf = Buffer.alloc(4)
   sizeBuf.writeUInt32LE(sigBuf.length)
@@ -240,12 +243,15 @@ Multifeed.prototype._setFeedSig = function (key, sig, cb) {
 }
 
 Multifeed.prototype._filterSignedKeys = function(keys, signatures) {
+  signatures = signatures || {}
   if(!this._restrictedMode) return keys // Perform no signature filtering
   var self = this
   return keys.filter(function(key) {
     let sig = signatures[key] || self._signatures[key]
     if (!sig || sig.length !== 128) return false // couldn't find a valid signature
-    return crypto.verify(Buffer.from(key, 'hex'), Buffer.from(sig, 'hex'), self._fake.key) // verify signature
+    var valid = crypto.verify(Buffer.from(key, 'hex'), Buffer.from(sig, 'hex'), self._fake.key) // verify signature
+    if (valid) self._signatures[key] = sig // keep all valid sigs for future reference
+    return valid
   })
 }
 
@@ -256,8 +262,15 @@ Multifeed.prototype.replicate = function (opts) {
 
   // Add key exchange listener
   mux.once('manifest', function(m) {
-    let filtered = self._filterSignedKeys(m.keys, m.signatures)
-    mux.wantFeeds(filtered)
+    if (self._restrictedMode) {
+      let filtered = self._filterSignedKeys(m.keys, m.signatures)
+
+      self._persistSignatures(function() {
+        mux.wantFeeds(filtered)
+      })
+    } else {
+      mux.wantFeeds(m.keys)
+    }
   })
 
   // Add replication listener
@@ -269,6 +282,7 @@ Multifeed.prototype.replicate = function (opts) {
         h[feed.key.toString('hex')] = feed
         return h
       },{})
+
       var sortedFeeds = keys.map(function(k){ return key2feed[k] })
       repl(sortedFeeds)
     })
@@ -281,7 +295,7 @@ Multifeed.prototype.replicate = function (opts) {
     mux.ready(function(){
       var keys = values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
       var extras = {}
-      if (this._signatures) extras.signatures = this._signatures
+      if (self._signatures) extras.signatures = self._signatures
       mux.haveFeeds(keys, extras)
     })
   })

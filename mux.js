@@ -115,10 +115,10 @@ Multiplexer.prototype._finalize = function(err) {
   if (err) {
     debug('[REPLICATION] destroyed due to', err)
     this.emit('error', err)
-    this._stream.destroy(err)
+    this.stream.destroy(err)
   } else {
     debug('[REPLICATION] finalized', err)
-    this._stream.finalize()
+    this.stream.finalize()
   }
 }
 
@@ -131,6 +131,7 @@ Multiplexer.prototype.haveFeeds = function (keys, opts) {
   var manifest = xtend(opts || {}, {
     keys: extractKeys(keys)
   })
+  debug('[REPLICATON] sending manifest: ', opts)
   this._localHave = manifest.keys
   this._feed.extension(MANIFEST, Buffer.from(JSON.stringify(manifest)))
 }

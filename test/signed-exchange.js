@@ -24,16 +24,16 @@ test('Signature store serialization', function(t) {
 })
 
 test('replicate signature aware multifeeds', function (t) {
-  t.plan(22)
+  t.plan(23)
   // Given a preshared keypair that can be derived
   // from a secret phrase or generated and then
   // shared.
   var pair = crypto.keyPair()
   debug('Performing test using publicKey:', pair.publicKey.toString('hex'), ' private:', pair.secretKey.toString('hex'))
   // All three use the same public key, but only two of them know the private key.
-  var writable1 = null
-  var writable2 = null
-  var readable = null
+  var computer = null
+  var laptop = null
+  var hashbase = null
   var unsignedFeed = null
 
   function spawnMultiFeed(opts, cb) {
@@ -75,20 +75,27 @@ test('replicate signature aware multifeeds', function (t) {
       .once('end', cb)
   }
 
-  writable1 = spawnMultiFeed({restricted: true, key: pair.publicKey, secretKey: pair.secretKey }, function(){
-    writable2 = spawnMultiFeed({restricted: true, key: pair.publicKey, secretKey: pair.secretKey }, function(){
-      readable = spawnMultiFeed({restricted: true, key: pair.publicKey },function () {
+  function fkeys(a) {
+    return a.map(function(f) { return f.key.toString('hex') }).sort()
+  }
 
-        var expectedFeeds = [...writable1.feeds(), ...writable2.feeds()].map(f => f.key.toString('hex'))
-        replicate(writable1, writable2, function() {
-          debugger
-          writable1.feeds()
+  computer = spawnMultiFeed({restricted: true, key: pair.publicKey, secretKey: pair.secretKey }, function(){
+    laptop = spawnMultiFeed({restricted: true, key: pair.publicKey, secretKey: pair.secretKey }, function(){
+      hashbase = spawnMultiFeed({restricted: true, key: pair.publicKey },function () {
+
+        var unsignedFeed = fkeys(hashbase.feeds())[0]
+        var signedFeeds = fkeys([].concat(computer.feeds()).concat(laptop.feeds()))
+        var allFeeds = [unsignedFeed].concat(signedFeeds).sort()
+
+        replicate(computer, laptop, function() {
+          replicate(hashbase, laptop, function() {
+            debugger
+            t.deepEquals(fkeys(computer.feeds()), signedFeeds)
+            t.deepEquals(fkeys(laptop.feeds()), signedFeeds)
+            t.deepEquals(fkeys(hashbase.feeds()), allFeeds)
+          })
         })
-        /*
-        var expectedFeeds = [...writable1.feeds(), writable2.feeds()].map(f => f.key.toString('hex'))
-        replicate(writable1, readable, function() {
-          debugger
-        })*/
+
       })
     })
   })
