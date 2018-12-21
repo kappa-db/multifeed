@@ -75,7 +75,7 @@ test('Key exchange API', function(t){
 })
 
 test('Actual replication', function(t) {
-  t.plan(28)
+  t.plan(18)
   var encryptionKey = Buffer.from('deadbeefdeadbeefdeadbeefdeadbeef') 
   var h1 = hypercore(ram)
   var h2 = hypercore(ram)
@@ -128,14 +128,14 @@ test('Actual replication', function(t) {
   })
 
   mux2.on('manifest', function(m) {
-    var r = hypercore(ram, m.keys[0])
-    r.on('download',function(index, data){
+    h1r = hypercore(ram, m.keys[0])
+    h1r.on('download',function(index, data){
       t.equal(data.toString('utf8'), 'hyper', 'h1 repl')
       t.equal(index, 0)
     })
     mux2.on('replicate', function(keys, repl) {
       t.deepEqual(keys, [h1,h2,h3].map(function(f) { return f.key.toString('hex')}).sort(), 'Mux2 replicating same keys')
-      repl([r, h2, h3])
+      repl([h1r, h2, h3])
     })
     mux2.wantFeeds(m.keys)
   })
@@ -164,21 +164,20 @@ test('Actual replication', function(t) {
     }))
     .pipe(mux1.stream)
     .once('end', function(err){
-      debugger
       t.error(err)
       h1r.get(0, function (err, data) {
         t.error(err)
-        t.equals(data, 'hyper', 'core 1 repl success!')
+        t.equals(data.toString('utf8'), 'hyper', 'core 1 repl success!')
       })
 
       h2r.get(0, function (err, data) {
         t.error(err)
-        t.equals(data, 'sea', 'core 2 repl success!')
+        t.equals(data.toString('utf8'), 'sea', 'core 2 repl success!')
       })
 
       h3r.get(0, function (err, data) {
         t.error(err)
-        t.equals(data, 'late to the party', 'core 3 repl success!')
+        t.equals(data.toString('utf8'), 'late to the party', 'core 3 repl success!')
       })
     })
 })

@@ -13,7 +13,7 @@ var PROTOCOL_VERSION = '2.0.0'
 var MANIFEST = 'MANIFEST'
 var REQUEST_FEEDS = 'REQUEST_FEEDS'
 /*
-var FEED_ADD = 'REQUEST_MANIFEST'
+var ANNOUNCE_FEED = 'ANNOUNCE_FEED'
 var REQUEST_FEED_SIGNATURE = 'REQUEST_FEED_SIGNATURE'
 var FEED_SIGNATURE = 'FEED_SIGNATURE'
 */
@@ -21,6 +21,7 @@ var FEED_SIGNATURE = 'FEED_SIGNATURE'
 var SupportedExtensions = [
   MANIFEST,
   REQUEST_FEEDS
+  //ANNOUNCE_FEED
   //REQUEST_MANIFEST,
   //REQUEST_FEED_SIGNATURE,
   //FEED_SIGNATURE,
@@ -58,13 +59,13 @@ function Multiplexer (key, opts) {
     debug('[REPLICATION] recv\'d header: ', JSON.stringify(header))
     if (!compatibleVersions(header.version, PROTOCOL_VERSION)) {
       debug('[REPLICATION] aborting; version mismatch (us='+PROTOCOL_VERSION+')')
-      self.emit('error', new Error('protocol version mismatch! us='+PROTOCOL_VERSION + ' them=' + header.version))
+      self._finalize(new Error('protocol version mismatch! us='+PROTOCOL_VERSION + ' them=' + header.version))
       return
     }
 
     if (header.client != MULTIFEED) {
       debug('[REPLICATION] aborting; Client mismatch! expected ', MULTIFEED, 'but got', header.client)
-      self.emit('error', new Error('Client mismatch! expected ' + MULTIFEED + ' but got ' + header.client))
+      self._finalize(new Error('Client mismatch! expected ' + MULTIFEED + ' but got ' + header.client))
       return
     }
     self.remoteClient = header
@@ -83,13 +84,15 @@ function Multiplexer (key, opts) {
         self._remoteWants = JSON.parse(message.toString('utf8'))
         self._initRepl()
         break
+      // case ANNOUNCE_FEED:
+      //  self._announceFeed(JSON.parse(message.toString('utf8')))
     }
   })
 
   // When not doing live-replication (keeping stream open for future appends)
   // Help hyper-proto to figure out when all cores have finished replicating,
   // so it can safely close the stream and notify all pipes: "we're done lads, good job!"
-  if (!self._opts.live) {
+  if (!self._opts.live && false) {
     stream.on('prefinalize', function (cb) {
       debugger
       var numFeeds = Object.keys(self._feeds).length + 1
@@ -114,6 +117,17 @@ Multiplexer.prototype.ready = function(cb) {
   this._ready(cb)
 }
 
+Multiplexer.prototype._finalize = function(err) {
+  if (err) {
+    debug('[REPLICATION] destroyed due to', err)
+    this.emit('error', err)
+    this._stream.destroy(err)
+  } else {
+    debug('[REPLICATION] finalized', err)
+    this._stream.finalize()
+  }
+}
+
 // Calls to this method results in the creation of a 'manifest'
 // that gets transmitted to the other end.
 // application is allowed to provide optional custom data in the opts for higher-level
@@ -124,7 +138,6 @@ Multiplexer.prototype.haveFeeds = function (keys, opts) {
     keys: extractKeys(keys)
   })
   this._localHave = manifest.keys
-
   this._feed.extension(MANIFEST, Buffer.from(JSON.stringify(manifest)))
 }
 
@@ -173,31 +186,44 @@ Multiplexer.prototype._initRepl = function() {
     }, [])
     .sort() // sort
 
-  // TODO: add hook to reject unwanted feeds if agreement is violated.
-
   debug('[REPLICATION] _initRepl', keys.length, keys)
-  if (!this._opts.live && keys.length === 0) {
-    this.end() // there's nothing to share
-  } else {
-    this.emit('replicate',  keys, startFeedReplication)
-  }
 
+  // End immedietly if there's nothing to replicate.
+  if (!this._opts.live && keys.length === 0) return this._finalize()
+
+  this.emit('replicate',  keys, startFeedReplication)
+  self.stream.expectedFeeds = receiving.length
   return keys
 
   function startFeedReplication(feeds){
     if (!Array.isArray(feeds)) feeds = [feeds]
+    // only the feeds passed to `feeds` option will be replicated (sent or received)
+    // hypercore-protocol has built in protection against receiving unexpected/not asked for data.
     feeds.forEach(function(feed) {
       debug('[REPLICATION] replicating feed:', feed.key.toString('hex'))
-      var feedStream = feed.replicate(xtend({}, self._opts, {
-        expectedFeeds: keys.length + 1,
+      feed.replicate(xtend({}, self._opts, {
         stream: self.stream
       }))
-      feedStream.on('end', function(err) {
-        debugger
-      })
+      self.stream.expectedFeeds++
     })
   }
 }
+
+/*'feed' event can be used to dynamically append feeds during live replication
+ * or to provide a secret non-pre-negotiated feed.
+ * Maybe send an ANNOUNCE_FEED message first containing the public-key in plain or encrypted form
+ * so that we can provide a core here. Cool for cabal to be able to add feeds in live mode without having to
+ * reconnect to a peer, true multifeed live replication.
+ * (I don't have the brainpower to speculate what's needed for live-feed-removal right now)
+Multiplexer.prototype._announceFeed = function (msg) {
+  self.stream.once('feed', function(discoveryKey) {
+    self.emit('announce-feed' , msg, function(feed){
+      if (!feed) return // no feed provided = not interested.
+      feed.replicate({stream: self.stream})
+      stream.expectedFeeds++
+    })
+  })
+}*/
 
 module.exports = Multiplexer
 module.exports.SupportedExtensions = SupportedExtensions
@@ -216,8 +242,5 @@ function extractKeys (keys) {
     if (typeof o === 'object' && o.key) return o.key.toString('hex')
     if (o instanceof Buffer) return o.toString('utf8')
   })
-    .reduce(function (a, o) {
-      if (o) a.push(o)
-      return a
-    }, [])
+    .filter(function(o) { return !!o }) // remove invalid entries
 }
