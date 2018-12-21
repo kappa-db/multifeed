@@ -11,7 +11,6 @@ var crypto = require('hypercore-crypto')
 var debug = require('debug')('multifeed')
 var multiplexer = require('./mux')
 
-var PROTOCOL_VERSION = '2.0.0'
 var FEED_SIGNATURES_JSON = 'feed_signatures.json'
 
 module.exports = Multifeed
