@@ -18,6 +18,7 @@ function Multifeed (hypercore, storage, opts) {
   this._opts = opts || {}
   this._middleware = null
   this.writerLock = mutexify()
+  this._middleware = []
 
   this.key = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
   if (this._opts.key) this.key = Buffer.from(this._opts.key)
@@ -120,8 +121,7 @@ Multifeed.prototype.writer = function (name, cb) {
           self._addFeed(feed, String(idx))
           release(function () {
             if (err) return cb(err)
-            cb(null, feed, idx)
-            self.emit('writer', feed, idx)
+            else cb(null, feed, idx)
           })
         })
       })
@@ -146,7 +146,27 @@ Multifeed.prototype.replicate = function (opts) {
 
   // Add key exchange listener
   mux.once('manifest', function(m) {
-    mux.wantFeeds(m.keys)
+    if (self._middleware.length) {
+      function callPlug(i, ctx) {
+        if (self._middleware.length === i) return mux.wantFeeds(ctx.keys)
+        var plug = self._middleware[i]
+
+        // Reliquish control to next if plug does not implement callback
+        if (typeof plug.want !== 'function') return callPlug(i + 1, ctx)
+
+        // give each plug a fresh reference to avoid peeking/postmodifications
+        plug.want(clone(ctx), function(keys) {
+          let n = clone(m)
+          n.keys = keys
+          callPlug(i + 1, n)
+        })
+      }
+      // Start loop
+      callPlug(0, m)
+    } else {
+      // default behaviour "want all"
+      mux.wantFeeds(m.keys)
+    }
   })
 
   // Add replication listener
@@ -169,8 +189,28 @@ Multifeed.prototype.replicate = function (opts) {
     if (err) return mux.stream.destroy(err)
     if (mux.stream.destroyed) return
     mux.ready(function(){
-      var keys = values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
-      mux.haveFeeds(keys)
+      var available = values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
+      if (self._middleware.length) {
+        // Orderly iterate through all plugs
+        function callPlug(i, ctx) {
+          if (i === self._middleware.length) return mux.haveFeeds(ctx.keys, ctx)
+          let plug = self._middleware[i]
+
+          // Reliquish control to next if plug does not implement callback
+          if (typeof plug.have !== 'function') return callPlug(i + 1, ctx)
+
+          // give each plug a fresh reference to avoid peeking/postmodifications
+          plug.have(clone(ctx), function(keys, extras){
+            extras = extras || {}
+            extras.keys = keys
+            callPlug(i + 1, extras)
+          })
+        }
+        callPlug(0, {keys: available})
+      } else {
+        // Default behaviour 'share all'
+        mux.haveFeeds(available)
+      }
     })
   })
 
@@ -271,3 +311,7 @@ function values (obj) {
   return Object.keys(obj).map(function (k) { return obj[k] })
 }
 
+// Deep clone
+function clone(obj) {
+  return JSON.parse(JSON.stringify(obj))
+}

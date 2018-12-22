@@ -125,8 +125,8 @@ multi.use({
   have: function(local, share) {
     // called on peer connection
     // select which feeds to share
-    share(local, {
-      random: local.map(function() { return Math.random() - 0.5 })
+    share(local.keys, {
+      random: local.keys.map(function() { return Math.random() - 0.5 })
     })
   },
   want: function(remote, request) {
