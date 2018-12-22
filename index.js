@@ -15,9 +15,13 @@ function Multifeed (hypercore, storage, opts) {
   this._feedKeyToFeed = {}
 
   this._hypercore = hypercore
-  this._opts = opts
-
+  this._opts = opts || {}
+  this._middleware = null
   this.writerLock = mutexify()
+
+  this.key = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
+  if (this._opts.key) this.key = Buffer.from(this._opts.key)
+  else debug('Warning, running multifeed with unsecure default key')
 
   // random-access-storage wrapper that wraps all hypercores in a directory
   // structures. (dir/0, dir/1, ...)
@@ -32,20 +36,9 @@ function Multifeed (hypercore, storage, opts) {
 
   var self = this
   this._ready = readyify(function (done) {
-    // Private key-less constant hypercore to bootstrap hypercore-protocol
-    // replication.
-    var protocolEncryptionKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
-    if (self._opts.key) protocolEncryptionKey = Buffer.from(self._opts.key)
-    else debug('Warning, running multifeed with unsecure default key')
-
-    var feed = hypercore(self._storage('_fake'), protocolEncryptionKey)
-
-    feed.ready(function () {
-      self._fake = feed
-      self._loadFeeds(function () {
-        debug('[INIT] finished loading feeds')
-        done()
-      })
+    self._loadFeeds(function () {
+      debug('[INIT] finished loading feeds')
+      done()
     })
   })
 }
@@ -126,8 +119,9 @@ Multifeed.prototype.writer = function (name, cb) {
         feed.ready(function () {
           self._addFeed(feed, String(idx))
           release(function () {
-            if (err) cb(err)
-            else cb(null, feed, idx)
+            if (err) return cb(err)
+            cb(null, feed, idx)
+            self.emit('writer', feed, idx)
           })
         })
       })
@@ -148,7 +142,7 @@ Multifeed.prototype.feed = function (key) {
 Multifeed.prototype.replicate = function (opts) {
   if (!opts) opts = {}
   var self = this
-  var mux = multiplexer(self._fake.key, opts)
+  var mux = multiplexer(self.key, opts)
 
   // Add key exchange listener
   mux.once('manifest', function(m) {
@@ -227,6 +221,15 @@ Multifeed.prototype.replicate = function (opts) {
     })
     if (!pending) cb()
   }
+}
+
+Multifeed.prototype.use = function(plug) {
+  if(this._middleware === null) this._middleware = []
+  this._middleware.push(plug)
+  var self = this
+  if (typeof plug.init === 'function') this.ready(function(){
+    plug.init(self)
+  })
 }
 
 function writeJsonToStorage (obj, storage, cb) {
