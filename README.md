@@ -112,20 +112,36 @@ With [npm](https://npmjs.org/) installed, run
 $ npm install multifeed
 ```
 
-## Hacks
+## Replicaton Policies
+You can control what gets replicated by providing a policy as a plugin:
 
-1. `hypercore-protocol` requires the first feed exchanged to be common between
-   replicating peers. This prevents two strangers from exchanging sets of
-   hypercores. A "fake" hypercore with a hardcoded public key is included in the
-   code to bootstrap the replication process. I discarded the private key, but
-   even if I didn't, it doesn't let me do anything nefarious. You could patch
-   this with your own key of choice.
-2. `hypercore-protocol` requires all feed keys be known upfront: only discovery
-   keys are exchanged (`discoveryKey = hash(key)`), so this module wraps the
-   hypercore replication duplex stream in a secondary duplex stream that
-   exchanges feed public keys upfront before moving on to the hypercore
-   replication mechanism.
+```js
+var multi = multifeed(hypercore, './db', { valueEncoding: 'json' })
+multi.use({
+  init: function(multifeed) {
+    // called on multifeed.ready
+    // use it for initalization.
+  },
+  have: function(local, share) {
+    // called on peer connection
+    // select which feeds to share
+    share(local, {
+      random: local.map(function() { return Math.random() - 0.5 })
+    })
+  },
+  want: function(remote, request) {
+    // called when remote peer's
+    // share list is available.
+    // remote.keys is always available
+    // remote contains also all custom props sent by remote.
+    var keys = remote.keys.filter(function(k, i){
+        return remote.random[i] > 0.5
+    })
+    request(keys)
+  }
+})
 
+```
 ## See Also
 
 - [multifeed-index](https://github.com/noffle/multifeed-index)
