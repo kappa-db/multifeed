@@ -197,10 +197,12 @@ Multiplexer.prototype._initRepl = function() {
     // only the feeds passed to `feeds` option will be replicated (sent or received)
     // hypercore-protocol has built in protection against receiving unexpected/not asked for data.
     feeds.forEach(function(feed) {
-      debug('[REPLICATION] replicating feed:', feed.key.toString('hex'))
-      feed.replicate(xtend({}, self._opts, {
-        stream: self.stream
-      }))
+      feed.ready(function() { // wait for each to be ready before replicating.
+        debug('[REPLICATION] replicating feed:', feed.key.toString('hex'))
+        feed.replicate(xtend({}, self._opts, {
+          stream: self.stream
+        }))
+      })
     })
   }
 }

@@ -174,7 +174,7 @@ Multifeed.prototype.replicate = function (opts) {
     addMissingKeys(keys, function(err){
       if(err) return mux.destroy(err)
 
-      var key2feed = values(self._feeds).reduce(function(h,feed){
+      var key2feed = values(self._feeds).reduce(function(h, feed){
         h[feed.key.toString('hex')] = feed
         return h
       },{})
@@ -235,12 +235,16 @@ Multifeed.prototype.replicate = function (opts) {
     var filtered = keys.filter(function (key) {
       return !Number.isNaN(parseInt(key, 16)) && key.length === 64
     })
-    filtered.forEach(function (key) {
-      var feeds = values(self._feeds).filter(function (feed) {
-        return feed.key.toString('hex') === key
-      })
-      if (!feeds.length) {
-        pending++
+
+    var existingKeys = values(self._feeds).map(function(feed) { return feed.key.toString('hex') })
+
+    var missingFeeds = filtered.filter(function (key) {
+      return existingKeys.indexOf(key) === -1
+    })
+
+    function initFeed(i) {
+      if (i >= missingFeeds.length) return cb()
+        var key = missingFeeds[i]
         var numFeeds = Object.keys(self._feeds).length
         var storage = self._storage(''+numFeeds)
         var feed
@@ -249,17 +253,15 @@ Multifeed.prototype.replicate = function (opts) {
           feed = self._hypercore(storage, Buffer.from(key, 'hex'), self._opts)
         } catch (e) {
           debug('[REPLICATION] failed to create new local hypercore, key=' + key.toString('hex'))
-          if (!--pending) cb()
-          return
+          return initFeed(i + 1)
         }
-        debug('[REPLICATION] succeeded in creating new local hypercore, key=' + key.toString('hex'))
-        self._addFeed(feed, String(numFeeds))
         feed.ready(function () {
-          if (!--pending) cb()
+          debug('[REPLICATION] succeeded in creating new local hypercore, key=' + key.toString('hex'))
+          self._addFeed(feed, String(numFeeds))
+          initFeed(i + 1)
         })
-      }
-    })
-    if (!pending) cb()
+    }
+    initFeed(0)
   }
 }
 
