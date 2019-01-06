@@ -199,7 +199,11 @@ Multiplexer.prototype._initRepl = function() {
     feeds.forEach(function(feed) {
       feed.ready(function() { // wait for each to be ready before replicating.
         debug('[REPLICATION] replicating feed:', feed.key.toString('hex'))
-        feed.replicate(xtend({}, self._opts, {
+        feed.replicate(xtend({}, {
+          live: self._opts.live,
+          download: self._opts.download,
+          upload: self._opts.upload,
+          encrypt: self._opts.encrypt,
           stream: self.stream
         }))
       })

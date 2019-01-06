@@ -1,8 +1,8 @@
 {
-  "name": "@telamon/multifeed",
+  "name": "multifeed",
   "description": "multi-writer hypercore",
   "author": "Stephen Whitmore <sww@eight.net>",
-  "version": "2.0.8",
+  "version": "2.0.9",
   "repository": {
     "url": "git://github.com/telamon/multifeed.git"
   },
