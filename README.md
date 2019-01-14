@@ -112,12 +112,13 @@ With [npm](https://npmjs.org/) installed, run
 $ npm install multifeed
 ```
 
-## Replicaton Policies
-You can control what gets replicated by providing a policy as a plugin:
+## Replication Policies
+
+You can control which feeds get replicated by providing a policy object:
 
 ```js
-var multi = multifeed(hypercore, './db', { valueEncoding: 'json' })
-multi.use({
+
+var randomReplication = {
   init: function(multifeed) {
     // called on multifeed.ready
     // use it for initalization.
@@ -139,7 +140,10 @@ multi.use({
     })
     request(keys)
   }
-})
+}
+
+var multi = multifeed(hypercore, './db', { valueEncoding: 'json' })
+multi.use(randomReplication)
 
 ```
 ## See Also
