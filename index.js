@@ -55,6 +55,7 @@ inherits(Multifeed, events.EventEmitter)
 Multifeed.prototype._addFeed = function (feed, name) {
   this._feeds[name] = feed
   this._feedKeyToFeed[feed.key.toString('hex')] = feed
+  feed.setMaxListeners(256)
   this.emit('feed', feed, name)
 }
 
