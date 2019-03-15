@@ -338,22 +338,6 @@ function deserializeHeader (buf) {
   return JSON.parse(jsonBuf.toString('utf8'))
 }
 
-function writeJsonToStorage (obj, storage, cb) {
-  writeStringToStorage(JSON.stringify(obj), storage, cb)
-}
-
-function readJsonFromStorage (storage, cb) {
-  readStringFromStorage(storage, function (err, text) {
-    if (err) return cb(err)
-    try {
-      var obj = JSON.parse(text)
-      cb(null, obj)
-    } catch (e) {
-      cb(e)
-    }
-  })
-}
-
 // TODO: what if the new data is shorter than the old data? things will break!
 function writeStringToStorage (string, storage, cb) {
   var buf = Buffer.from(string, 'utf8')
