@@ -173,23 +173,34 @@ test('get localfeed by name across disk loads', function (t) {
   t.plan(5)
 
   var storage = tmp()
-  var key
-
   var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
 
   multi.writer('minuette', function (err, w) {
     t.error(err)
     t.ok(w.key)
-    key = w.key
 
-    // HACK: close its storage
-    w._storage.close(function () {
+    multi.close(function () {
       var multi2 = multifeed(hypercore, storage, { valueEncoding: 'json' })
-      multi.writer('minuette', function (err, w2) {
+      multi2.writer('minuette', function (err, w2) {
         t.error(err)
         t.ok(w.key)
         t.deepEquals(w2.key, w.key, 'keys match')
       })
+    })
+  })
+})
+
+test('close', function (t) {
+  var storage = tmp()
+  var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
+
+  multi.writer('minuette', function (err, w) {
+    t.error(err)
+
+    multi.close(function () {
+      t.deepEquals(multi.feeds(), [], 'no feeds present')
+      t.equals(multi.closed, true)
+      t.end()
     })
   })
 })

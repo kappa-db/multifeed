@@ -104,6 +104,16 @@ replication endpoints.
 
 Emitted whenever a new feed is added, whether locally or remotely.
 
+## multi.close(cb)
+
+Close all file resources being held by the multifeed instance. `cb` is called once this is complete.
+
+**NOTE**: Once a multifeed is closed, use of the rest of the API is basically undefined behaviour.
+
+## multi.closed
+
+`true` if `close()` was run successfully, falsey otherwise.
+
 ## Install
 
 With [npm](https://npmjs.org/) installed, run

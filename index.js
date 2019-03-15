@@ -24,6 +24,8 @@ function Multifeed (hypercore, storage, opts) {
 
   this.writerLock = mutexify()
 
+  this.closed = false
+
   // random-access-storage wrapper that wraps all hypercores in a directory
   // structures. (dir/0, dir/1, ...)
   this._storage = function (dir) {
@@ -61,6 +63,34 @@ Multifeed.prototype._addFeed = function (feed, name) {
 
 Multifeed.prototype.ready = function (cb) {
   this._ready(cb)
+}
+
+Multifeed.prototype.close = function (cb) {
+  var self = this
+
+  this.writerLock(function (release) {
+    function done (err) {
+      release(function () {
+        if (!err) self.closed = true
+        cb(err)
+      })
+    }
+
+    var feeds = values(self._feeds)
+
+    function next (n) {
+      if (n >= feeds.length) {
+        self._feeds = []
+        return done()
+      }
+      feeds[n].close(function (err) {
+        if (err) return done(err)
+        next(++n)
+      })
+    }
+
+    next(0)
+  })
 }
 
 Multifeed.prototype._loadFeeds = function (cb) {
@@ -352,4 +382,3 @@ function compatibleVersions (v1, v2) {
 function values (obj) {
   return Object.keys(obj).map(function (k) { return obj[k] })
 }
-
