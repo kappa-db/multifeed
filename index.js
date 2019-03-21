@@ -165,8 +165,8 @@ Multifeed.prototype.replicate = function (opts) {
         return h
       },{})
 
-      var sortedFeeds = keys.map(function(k){ return key2feed[k] })
-      repl(sortedFeeds)
+      var feeds = keys.map(function(k){ return key2feed[k] })
+      repl(feeds)
     })
   })
 

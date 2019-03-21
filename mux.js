@@ -12,19 +12,10 @@ var PROTOCOL_VERSION = '2.0.0'
 // extensions
 var MANIFEST = 'MANIFEST'
 var REQUEST_FEEDS = 'REQUEST_FEEDS'
-/*
-var ANNOUNCE_FEED = 'ANNOUNCE_FEED'
-var REQUEST_FEED_SIGNATURE = 'REQUEST_FEED_SIGNATURE'
-var FEED_SIGNATURE = 'FEED_SIGNATURE'
-*/
 
 var SupportedExtensions = [
   MANIFEST,
   REQUEST_FEEDS
-  //ANNOUNCE_FEED
-  //REQUEST_MANIFEST,
-  //REQUEST_FEED_SIGNATURE,
-  //FEED_SIGNATURE,
 ]
 
 // `key` - protocol encryption key
@@ -45,17 +36,21 @@ function Multiplexer (key, opts) {
   var stream = this.stream = protocol(Object.assign(opts,{
     userData: Buffer.from(JSON.stringify({
       client: MULTIFEED,
-      version: PROTOCOL_VERSION,
-      // Help! exposing available extensions might be good for future version tolerance,
-      // but at the same time we're poentiallyleaking our user-agent fingerprint to a third party.
-      extensions: self.extensions
+      version: PROTOCOL_VERSION
     }))
   }))
 
   var feed = this._feed = stream.feed(key)
 
   stream.on('handshake', function () {
-    var header = JSON.parse(this.userData.toString('utf8'))
+    var header = null
+    try {
+      header = JSON.parse(this.userData.toString('utf8'))
+    } catch (err) {
+      debug('[REPLICATION] Failed parsing JSON header', err)
+      self._finalize(err)
+      return
+    }
     debug('[REPLICATION] recv\'d header: ', JSON.stringify(header))
     if (!compatibleVersions(header.version, PROTOCOL_VERSION)) {
       debug('[REPLICATION] aborting; version mismatch (us='+PROTOCOL_VERSION+')')
@@ -68,7 +63,6 @@ function Multiplexer (key, opts) {
       self._finalize(new Error('Client mismatch! expected ' + MULTIFEED + ' but got ' + header.client))
       return
     }
-    self.remoteClient = header
     self.emit('ready', header)
   })
 
