@@ -3,6 +3,7 @@ var hypercore = require('hypercore')
 var multifeed = require('..')
 var ram = require('random-access-memory')
 var tmp = require('tmp').tmpNameSync
+var rimraf = require('rimraf')
 
 test('no feeds', function (t) {
   var multi = multifeed(hypercore, ram, { valueEncoding: 'json' })
@@ -200,18 +201,10 @@ test('close', function (t) {
     multi.close(function () {
       t.deepEquals(multi.feeds(), [], 'no feeds present')
       t.equals(multi.closed, true)
-      t.end()
+      rimraf(storage, function (err) {
+        t.error(err, 'Deleted folder without error')
+        t.end()
+      })
     })
-  })
-})
-
-test('close empty multifeed', function (t) {
-  var storage = tmp()
-  var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
-
-  multi.close(function () {
-    t.deepEquals(multi.feeds(), [], 'no feeds present')
-    t.equals(multi.closed, true)
-    t.end()
   })
 })

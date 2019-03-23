@@ -26,6 +26,7 @@
   "devDependencies": {
     "hypercore": "^6.18.1",
     "random-access-memory": "^2.4.0",
+    "rimraf": "^2.6.3",
     "standard": "~10.0.0",
     "tape": "~4.6.2",
     "tmp": "0.0.33"
