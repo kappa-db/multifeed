@@ -76,11 +76,12 @@ Multifeed.prototype.close = function (cb) {
       })
     }
 
-    var feeds = values(self._feeds)
+    var feeds = values(self._feeds).concat(self._fake)
 
     function next (n) {
       if (n >= feeds.length) {
         self._feeds = []
+        self.fake = undefined
         return done()
       }
       feeds[n].close(function (err) {
@@ -193,7 +194,7 @@ Multifeed.prototype.replicate = function (opts) {
       })
     })
   }
-  
+
   function addMissingKeysLocked (keys, cb) {
     var pending = 0
     debug('[REPLICATION] recv\'d ' + keys.length + ' keys')
