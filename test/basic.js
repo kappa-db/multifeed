@@ -204,3 +204,14 @@ test('close', function (t) {
     })
   })
 })
+
+test('close empty multifeed', function (t) {
+  var storage = tmp()
+  var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
+
+  multi.close(function () {
+    t.deepEquals(multi.feeds(), [], 'no feeds present')
+    t.equals(multi.closed, true)
+    t.end()
+  })
+})
