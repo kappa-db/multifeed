@@ -78,8 +78,6 @@ function Multiplexer (key, opts) {
         self._remoteWants = JSON.parse(message.toString('utf8'))
         self._initRepl()
         break
-      // case ANNOUNCE_FEED:
-      //  self._announceFeed(JSON.parse(message.toString('utf8')))
     }
   })
 
@@ -129,9 +127,6 @@ Multiplexer.prototype.haveFeeds = function (keys, opts) {
   this._localHave = manifest.keys
   this._feed.extension(MANIFEST, Buffer.from(JSON.stringify(manifest)))
 }
-
-// TODO: provide feature to share a secret set of keys that are available but not announced over the wire and can be secretly requested.
-// Multiplexer.prototype.secretlyHaveFeeds = function (keys) { ... }
 
 // Sends your wishlist to the remote
 // for classical multifeed `ACCEPT_ALL` behaviour both parts must call `want(remoteHas)`
@@ -204,22 +199,6 @@ Multiplexer.prototype._initRepl = function() {
     })
   }
 }
-
-/*'feed' event can be used to dynamically append feeds during live replication
- * or to provide a secret non-pre-negotiated feed.
- * Maybe send an ANNOUNCE_FEED message first containing the public-key in plain or encrypted form
- * so that we can provide a core here. Cool for cabal to be able to add feeds in live mode without having to
- * reconnect to a peer, true multifeed live replication.
- * (I don't have the brainpower to speculate what's needed for live-feed-removal right now)
-Multiplexer.prototype._announceFeed = function (msg) {
-  self.stream.once('feed', function(discoveryKey) {
-    self.emit('announce-feed' , msg, function(feed){
-      if (!feed) return // no feed provided = not interested.
-      feed.replicate({stream: self.stream})
-      stream.expectedFeeds++
-    })
-  })
-}*/
 
 module.exports = Multiplexer
 module.exports.SupportedExtensions = SupportedExtensions
