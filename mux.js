@@ -4,7 +4,6 @@ var inherits = require('inherits')
 var events = require('events')
 var debug = require('debug')('multifeed')
 var hypercore = require('hypercore')
-var xtend = require('xtend')
 
 // constants
 var MULTIFEED = 'MULTIFEED'
@@ -120,7 +119,7 @@ Multiplexer.prototype._finalize = function(err) {
 // 'want' selections.
 // The manifest-prop `keys` is required, and must equal an array of strings.
 Multiplexer.prototype.haveFeeds = function (keys, opts) {
-  var manifest = xtend(opts || {}, {
+  var manifest = Object.assign(opts || {}, {
     keys: extractKeys(keys)
   })
   debug('[REPLICATON] sending manifest: ', opts)
@@ -188,7 +187,7 @@ Multiplexer.prototype._initRepl = function() {
     feeds.forEach(function(feed) {
       feed.ready(function() { // wait for each to be ready before replicating.
         debug('[REPLICATION] replicating feed:', feed.key.toString('hex'))
-        feed.replicate(xtend({}, {
+        feed.replicate(Object.assign({}, {
           live: self._opts.live,
           download: self._opts.download,
           upload: self._opts.upload,
