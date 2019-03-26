@@ -265,8 +265,8 @@ Multifeed.prototype.replicate = function (opts) {
 function writeStringToStorage (string, storage, cb) {
   var buf = Buffer.from(string, 'utf8')
   storage.write(0, buf, function (err) {
-    storage.close(function () {
-      cb(err)
+    storage.close(function (err2) {
+      cb(err || err2)
     })
   })
 }
@@ -278,8 +278,8 @@ function readStringFromStorage (storage, cb) {
     storage.read(0, len, function (err, buf) {
       if (err) return cb(err)
       var str = buf.toString()
-      storage.close(function () {
-        cb(null, str)
+      storage.close(function (err) {
+        cb(err, err ? null : str)
       })
     })
   })
