@@ -76,11 +76,12 @@ Multifeed.prototype.close = function (cb) {
       })
     }
 
-    var feeds = values(self._feeds)
+    var feeds = values(self._feeds).concat(self._fake)
 
     function next (n) {
       if (n >= feeds.length) {
         self._feeds = []
+        self.fake = undefined
         return done()
       }
       feeds[n].close(function (err) {
@@ -263,7 +264,11 @@ Multifeed.prototype.replicate = function (opts) {
 // TODO: what if the new data is shorter than the old data? things will break!
 function writeStringToStorage (string, storage, cb) {
   var buf = Buffer.from(string, 'utf8')
-  storage.write(0, buf, cb)
+  storage.write(0, buf, function (err) {
+    storage.close(function () {
+      cb(err)
+    })
+  })
 }
 
 function readStringFromStorage (storage, cb) {
@@ -273,7 +278,9 @@ function readStringFromStorage (storage, cb) {
     storage.read(0, len, function (err, buf) {
       if (err) return cb(err)
       var str = buf.toString()
-      cb(null, str)
+      storage.close(function () {
+        cb(null, str)
+      })
     })
   })
 }
