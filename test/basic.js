@@ -208,3 +208,29 @@ test('close', function (t) {
     })
   })
 })
+
+test('close after double-open', function (t) {
+  var storage = tmp()
+
+  openWriteClose(function (err) {
+    t.error(err)
+    openWriteClose(function (err) {
+      t.error(err)
+      rimraf(storage, function (err) {
+        t.error(err, 'Deleted folder without error')
+        t.end()
+      })
+    })
+  })
+
+  function openWriteClose (cb) {
+    var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
+    multi.writer('minuette', function (err, w) {
+      t.error(err)
+      w.append({type: 'node'}, function (err) {
+        t.error(err)
+        multi.close(cb)
+      })
+    })
+  }
+})

@@ -81,7 +81,7 @@ Multifeed.prototype.close = function (cb) {
     function next (n) {
       if (n >= feeds.length) {
         self._feeds = []
-        self.fake = undefined
+        self._fake = undefined
         return done()
       }
       feeds[n].close(function (err) {
