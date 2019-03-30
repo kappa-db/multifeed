@@ -113,7 +113,10 @@ Multifeed.prototype._loadFeeds = function (cb) {
           } else {
             self._addFeed(feed, String(n))
           }
-          next(n+1)
+          st.close(function (err) {
+            if (err) return cb(err)
+            next(n+1)
+          })
         })
       })
     })
