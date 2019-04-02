@@ -81,7 +81,7 @@ Multifeed.prototype.close = function (cb) {
     function next (n) {
       if (n >= feeds.length) {
         self._feeds = []
-        self.fake = undefined
+        self._fake = undefined
         return done()
       }
       feeds[n].close(function (err) {
@@ -113,7 +113,10 @@ Multifeed.prototype._loadFeeds = function (cb) {
           } else {
             self._addFeed(feed, String(n))
           }
-          next(n+1)
+          st.close(function (err) {
+            if (err) return cb(err)
+            next(n+1)
+          })
         })
       })
     })
