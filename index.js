@@ -15,9 +15,14 @@ function Multifeed (hypercore, storage, opts) {
   this._feedKeyToFeed = {}
 
   this._hypercore = hypercore
-  this._opts = opts
-
+  this._opts = opts || {}
+  this._middleware = null
   this.writerLock = mutexify()
+  this._middleware = []
+
+  this.key = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
+  if (this._opts.key) this.key = Buffer.from(this._opts.key)
+  else debug('Warning, running multifeed with unsecure default key')
 
   this.closed = false
 
@@ -34,20 +39,9 @@ function Multifeed (hypercore, storage, opts) {
 
   var self = this
   this._ready = readyify(function (done) {
-    // Private key-less constant hypercore to bootstrap hypercore-protocol
-    // replication.
-    var protocolEncryptionKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
-    if (self._opts.key) protocolEncryptionKey = Buffer.from(self._opts.key)
-    else debug('Warning, running multifeed with unsecure default key')
-
-    var feed = hypercore(self._storage('_fake'), protocolEncryptionKey)
-
-    feed.ready(function () {
-      self._fake = feed
-      self._loadFeeds(function () {
-        debug('[INIT] finished loading feeds')
-        done()
-      })
+    self._loadFeeds(function () {
+      debug('[INIT] finished loading feeds')
+      done()
     })
   })
 }
@@ -161,7 +155,7 @@ Multifeed.prototype.writer = function (name, cb) {
         feed.ready(function () {
           self._addFeed(feed, String(idx))
           release(function () {
-            if (err) cb(err)
+            if (err) return cb(err)
             else cb(null, feed, idx)
           })
         })
@@ -183,11 +177,31 @@ Multifeed.prototype.feed = function (key) {
 Multifeed.prototype.replicate = function (opts) {
   if (!opts) opts = {}
   var self = this
-  var mux = multiplexer(self._fake.key, opts)
+  var mux = multiplexer(self.key, opts)
 
   // Add key exchange listener
   mux.once('manifest', function(m) {
-    mux.wantFeeds(m.keys)
+    if (self._middleware.length) {
+      function callPlug(i, ctx) {
+        if (self._middleware.length === i) return mux.wantFeeds(ctx.keys)
+        var plug = self._middleware[i]
+
+        // Reliquish control to next if plug does not implement callback
+        if (typeof plug.want !== 'function') return callPlug(i + 1, ctx)
+
+        // give each plug a fresh reference to avoid peeking/postmodifications
+        plug.want(clone(ctx), function(keys) {
+          let n = clone(m)
+          n.keys = keys
+          callPlug(i + 1, n)
+        })
+      }
+      // Start loop
+      callPlug(0, m)
+    } else {
+      // default behaviour "want all"
+      mux.wantFeeds(m.keys)
+    }
   })
 
   // Add replication listener
@@ -195,7 +209,7 @@ Multifeed.prototype.replicate = function (opts) {
     addMissingKeys(keys, function(err){
       if(err) return mux.destroy(err)
 
-      var key2feed = values(self._feeds).reduce(function(h,feed){
+      var key2feed = values(self._feeds).reduce(function(h, feed){
         h[feed.key.toString('hex')] = feed
         return h
       },{})
@@ -210,8 +224,28 @@ Multifeed.prototype.replicate = function (opts) {
     if (err) return mux.stream.destroy(err)
     if (mux.stream.destroyed) return
     mux.ready(function(){
-      var keys = values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
-      mux.haveFeeds(keys)
+      var available = values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
+      if (self._middleware.length) {
+        // Orderly iterate through all plugs
+        function callPlug(i, ctx) {
+          if (i === self._middleware.length) return mux.haveFeeds(ctx.keys, ctx)
+          let plug = self._middleware[i]
+
+          // Reliquish control to next if plug does not implement callback
+          if (typeof plug.have !== 'function') return callPlug(i + 1, ctx)
+
+          // give each plug a fresh reference to avoid peeking/postmodifications
+          plug.have(clone(ctx), function(keys, extras){
+            extras = extras || {}
+            extras.keys = keys
+            callPlug(i + 1, extras)
+          })
+        }
+        callPlug(0, {keys: available})
+      } else {
+        // Default behaviour 'share all'
+        mux.haveFeeds(available)
+      }
     })
   })
 
@@ -236,12 +270,16 @@ Multifeed.prototype.replicate = function (opts) {
     var filtered = keys.filter(function (key) {
       return !Number.isNaN(parseInt(key, 16)) && key.length === 64
     })
-    filtered.forEach(function (key) {
-      var feeds = values(self._feeds).filter(function (feed) {
-        return feed.key.toString('hex') === key
-      })
-      if (!feeds.length) {
-        pending++
+
+    var existingKeys = values(self._feeds).map(function(feed) { return feed.key.toString('hex') })
+
+    var missingFeeds = filtered.filter(function (key) {
+      return existingKeys.indexOf(key) === -1
+    })
+
+    function initFeed(i) {
+      if (i >= missingFeeds.length) return cb()
+        var key = missingFeeds[i]
         var numFeeds = Object.keys(self._feeds).length
         var storage = self._storage(''+numFeeds)
         var feed
@@ -250,18 +288,25 @@ Multifeed.prototype.replicate = function (opts) {
           feed = self._hypercore(storage, Buffer.from(key, 'hex'), self._opts)
         } catch (e) {
           debug('[REPLICATION] failed to create new local hypercore, key=' + key.toString('hex'))
-          if (!--pending) cb()
-          return
+          return initFeed(i + 1)
         }
-        debug('[REPLICATION] succeeded in creating new local hypercore, key=' + key.toString('hex'))
-        self._addFeed(feed, String(numFeeds))
         feed.ready(function () {
-          if (!--pending) cb()
+          debug('[REPLICATION] succeeded in creating new local hypercore, key=' + key.toString('hex'))
+          self._addFeed(feed, String(numFeeds))
+          initFeed(i + 1)
         })
-      }
-    })
-    if (!pending) cb()
+    }
+    initFeed(0)
   }
+}
+
+Multifeed.prototype.use = function(plug) {
+  if(this._middleware === null) this._middleware = []
+  this._middleware.push(plug)
+  var self = this
+  if (typeof plug.init === 'function') this.ready(function(){
+    plug.init(self)
+  })
 }
 
 // TODO: what if the new data is shorter than the old data? things will break!
@@ -291,4 +336,9 @@ function readStringFromStorage (storage, cb) {
 
 function values (obj) {
   return Object.keys(obj).map(function (k) { return obj[k] })
+}
+
+// Deep clone
+function clone(obj) {
+  return JSON.parse(JSON.stringify(obj))
 }

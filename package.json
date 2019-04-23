@@ -4,10 +4,12 @@
   "author": "Stephen Whitmore <sww@eight.net>",
   "version": "3.0.3",
   "repository": {
-    "url": "git://github.com/noffle/multifeed.git"
+    "url": "git://github.com/telamon/multifeed.git"
   },
   "homepage": "https://github.com/noffle/multifeed",
-  "bugs": "https://github.com/noffle/multifeed/issues",
+  "bugs": {
+    "url": "https://github.com/telamon/multifeed/issues"
+  },
   "main": "index.js",
   "scripts": {
     "test": "tape test/*.js",
@@ -31,5 +33,8 @@
     "through2": "^3.0.0",
     "tmp": "0.0.33"
   },
-  "license": "ISC"
+  "license": "ISC",
+  "directories": {
+    "test": "test"
+  }
 }
