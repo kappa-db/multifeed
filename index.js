@@ -70,7 +70,7 @@ Multifeed.prototype.close = function (cb) {
       })
     }
 
-    var feeds = values(self._feeds).concat(self._fake)
+    var feeds = values(self._feeds)
 
     function next (n) {
       if (n >= feeds.length) {
@@ -190,7 +190,7 @@ Multifeed.prototype.replicate = function (opts) {
         if (typeof plug.want !== 'function') return callPlug(i + 1, ctx)
 
         // give each plug a fresh reference to avoid peeking/postmodifications
-        plug.want(clone(ctx), function(keys) {
+        plug.want.bind(self)(clone(ctx), function(keys) {
           let n = clone(m)
           n.keys = keys
           callPlug(i + 1, n)
@@ -235,7 +235,7 @@ Multifeed.prototype.replicate = function (opts) {
           if (typeof plug.have !== 'function') return callPlug(i + 1, ctx)
 
           // give each plug a fresh reference to avoid peeking/postmodifications
-          plug.have(clone(ctx), function(keys, extras){
+          plug.have.bind(self)(clone(ctx), function(keys, extras){
             extras = extras || {}
             extras.keys = keys
             callPlug(i + 1, extras)
