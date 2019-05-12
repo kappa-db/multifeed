@@ -160,7 +160,7 @@ test('regression: start replicating before feeds are loaded', function (t) {
   }
 })
 
-test.only('regression: announce new feed on existing connections', function(t) {
+test('regression: announce new feed on existing connections', function(t) {
   t.plan(19);
   var m1 = multifeed(hypercore, ram, { valueEncoding: 'json' })
   var m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })
