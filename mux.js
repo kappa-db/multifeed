@@ -4,7 +4,8 @@ var inherits = require('inherits')
 var events = require('events')
 var debug = require('debug')('multifeed')
 var hypercore = require('hypercore')
-var throttle = require('throttle-debounce').throttle
+//var throttle = require('throttle-debounce').throttle
+
 // constants
 var MULTIFEED = 'MULTIFEED'
 var PROTOCOL_VERSION = '2.0.0'
