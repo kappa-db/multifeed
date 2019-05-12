@@ -13,6 +13,7 @@ function Multifeed (hypercore, storage, opts) {
   if (!(this instanceof Multifeed)) return new Multifeed(hypercore, storage, opts)
   this._feeds = {}
   this._feedKeyToFeed = {}
+  this._streams = []
 
   this._hypercore = hypercore
   this._opts = opts
@@ -59,6 +60,7 @@ Multifeed.prototype._addFeed = function (feed, name) {
   this._feedKeyToFeed[feed.key.toString('hex')] = feed
   feed.setMaxListeners(256)
   this.emit('feed', feed, name)
+  this._forwardLiveFeedAnnouncements(feed, name)
 }
 
 Multifeed.prototype.ready = function (cb) {
@@ -186,12 +188,12 @@ Multifeed.prototype.replicate = function (opts) {
   var mux = multiplexer(self._fake.key, opts)
 
   // Add key exchange listener
-  mux.once('manifest', function(m) {
+  mux.on('manifest', function(m) {
     mux.wantFeeds(m.keys)
   })
 
   // Add replication listener
-  mux.once('replicate', function(keys, repl) {
+  mux.on('replicate', function(keys, repl) {
     addMissingKeys(keys, function(err){
       if(err) return mux.destroy(err)
 
@@ -213,6 +215,16 @@ Multifeed.prototype.replicate = function (opts) {
       var keys = values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
       mux.haveFeeds(keys)
     })
+
+    if(opts.live) {
+      // Push session to _streams array
+      self._streams.push(mux)
+
+      // Register removal
+      mux.stream.on('end', function(err) {
+        self._streams.splice(self._streams.indexOf(mux), 1)
+      })
+    }
   })
 
   return mux.stream
@@ -262,6 +274,19 @@ Multifeed.prototype.replicate = function (opts) {
     })
     if (!pending) cb()
   }
+}
+
+Multifeed.prototype._forwardLiveFeedAnnouncements = function (feed, name) {
+  if (!this._streams.length) return // no-op if no live-connections
+  var self = this
+  var hexKey = feed.key.toString('hex');
+  // Tell each remote that we have a new key available if unless they already have it.
+  this._streams.forEach(function(mux) {
+    if (mux._remoteHas.indexOf(hexKey) === -1) {
+      debug("Forwarding new feed to existing peers:", hexKey)
+      mux.haveFeeds([hexKey])
+    }
+  })
 }
 
 // TODO: what if the new data is shorter than the old data? things will break!

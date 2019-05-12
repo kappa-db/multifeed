@@ -4,7 +4,7 @@ var inherits = require('inherits')
 var events = require('events')
 var debug = require('debug')('multifeed')
 var hypercore = require('hypercore')
-
+var throttle = require('throttle-debounce').throttle
 // constants
 var MULTIFEED = 'MULTIFEED'
 var PROTOCOL_VERSION = '2.0.0'
@@ -71,6 +71,11 @@ function Multiplexer (key, opts) {
       case MANIFEST:
         var rm = JSON.parse(message.toString('utf8'))
         self._remoteHas = rm.keys
+
+        // TODO: Throttle this emit
+        // not sure how to handle misbehaving clients.
+        // Should we allow buffering of remote feed-announcements and combine them into a single manifest?
+        // or should we just ignore any manifests that were sent to fast?
         self.emit('manifest', rm)
         break
       case REQUEST_FEEDS:
@@ -119,10 +124,16 @@ Multiplexer.prototype._finalize = function(err) {
 // 'want' selections.
 // The manifest-prop `keys` is required, and must equal an array of strings.
 Multiplexer.prototype.haveFeeds = function (keys, opts) {
+  // TODO: Throttle this function
+  // make a temporary 'this._feedsToAnnounce' buffer/array
+  // once throttle timer expires send all keys as a single batch instead
+  // of current one-by-one behaviour.
+
   var manifest = Object.assign(opts || {}, {
     keys: extractKeys(keys)
   })
-  debug('[REPLICATON] sending manifest: ', opts)
+
+  debug('[REPLICATON] sending manifest: ', manifest)
   this._localHave = manifest.keys
   this._feed.extension(MANIFEST, Buffer.from(JSON.stringify(manifest)))
 }
