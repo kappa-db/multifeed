@@ -76,7 +76,7 @@ function Multiplexer (key, opts) {
       switch(type) {
         case MANIFEST:
           self._remoteOffer = uniq(self._remoteOffer.concat(data.keys))
-          self.emit('manifest', data)
+          self.emit('manifest', data, self.requestFeeds.bind(self))
           break
         case REQUEST_FEEDS:
           self._requestHandler(data)
