@@ -4,20 +4,21 @@ var inherits = require('inherits')
 var events = require('events')
 var debug = require('debug')('multifeed')
 var hypercore = require('hypercore')
-//var throttle = require('throttle-debounce').throttle
 
 // constants
 var MULTIFEED = 'MULTIFEED'
-var PROTOCOL_VERSION = '2.0.0'
+var PROTOCOL_VERSION = '3.0.0'
+
 // extensions
 var MANIFEST = 'MANIFEST'
 var REQUEST_FEEDS = 'REQUEST_FEEDS'
+var REPLICATE_FEEDS = 'REPLICATE_FEEDS'
 
 var SupportedExtensions = [
   MANIFEST,
+  REPLICATE_FEEDS, // <-- bug in hyperprotocol? extension is never fired if declared last
   REQUEST_FEEDS
 ]
-
 // `key` - protocol encryption key
 // `opts`- hypercore-protocol opts
 function Multiplexer (key, opts) {
@@ -25,21 +26,23 @@ function Multiplexer (key, opts) {
   debug('[REPLICATION] New mux initialized', key.toString('hex'), opts)
   var self = this
   self._opts = opts = opts || {}
-  self.extensions = opts.extensions = SupportedExtensions || opts.extensions
 
   // initialize
-  self._localHave = null
-  self._localWant = null
-  self._remoteHas = null
-  self._remoteWants = null
+  self._localOffer = []
+  self._requestedFeeds = []
+  self._remoteOffer = []
+  self._activeFeedStreams = {}
 
-  var stream = this.stream = protocol(Object.assign(opts,{
+  var stream = this.stream = protocol(Object.assign({},opts,{
     userData: Buffer.from(JSON.stringify({
       client: MULTIFEED,
       version: PROTOCOL_VERSION
-    }))
+    })),
+    // Extend hypercore-protocol for the main stream with multifeed events
+    extensions: SupportedExtensions
   }))
 
+  // This is the new 'fake feed' which is purely virtual
   var feed = this._feed = stream.feed(key)
 
   stream.on('handshake', function () {
@@ -67,22 +70,26 @@ function Multiplexer (key, opts) {
   })
 
   feed.on('extension', function (type, message) {
-    debug('Extension:', type, message.toString('utf8'))
-    switch(type) {
-      case MANIFEST:
-        var rm = JSON.parse(message.toString('utf8'))
-        self._remoteHas = rm.keys
-
-        // TODO: Throttle this emit
-        // not sure how to handle misbehaving clients.
-        // Should we allow buffering of remote feed-announcements and combine them into a single manifest?
-        // or should we just ignore any manifests that were sent to fast?
-        self.emit('manifest', rm)
-        break
-      case REQUEST_FEEDS:
-        self._remoteWants = JSON.parse(message.toString('utf8'))
-        self._initRepl()
-        break
+    try {
+      debug('Extension:', type, message.toString('utf8'))
+      var data = JSON.parse(message.toString('utf8'))
+      switch(type) {
+        case MANIFEST:
+          self._remoteOffer = uniq(self._remoteOffer.concat(data.keys))
+          self.emit('manifest', data)
+          break
+        case REQUEST_FEEDS:
+          self._requestHandler(data)
+          break
+        case REPLICATE_FEEDS:
+          self._onRemoteReplicate(data)
+          break
+      }
+    } catch (err) {
+      // Catch JSON parse errors and any other errors that occur
+      // during replication and destroy this remote connection
+      debug('Error during recieve data handler', err)
+      self._finalize(err)
     }
   })
 
@@ -124,67 +131,61 @@ Multiplexer.prototype._finalize = function(err) {
 // application is allowed to provide optional custom data in the opts for higher-level
 // 'want' selections.
 // The manifest-prop `keys` is required, and must equal an array of strings.
-Multiplexer.prototype.haveFeeds = function (keys, opts) {
-  // TODO: Throttle this function
-  // make a temporary 'this._feedsToAnnounce' buffer/array
-  // once throttle timer expires send all keys as a single batch instead
-  // of current one-by-one behaviour.
-
+Multiplexer.prototype.offerFeeds = function (keys, opts) {
   var manifest = Object.assign(opts || {}, {
     keys: extractKeys(keys)
   })
 
   debug('[REPLICATON] sending manifest: ', manifest)
-  this._localHave = manifest.keys
+  this._localOffer = this._localOffer.concat(manifest.keys)
   this._feed.extension(MANIFEST, Buffer.from(JSON.stringify(manifest)))
 }
 
 // Sends your wishlist to the remote
 // for classical multifeed `ACCEPT_ALL` behaviour both parts must call `want(remoteHas)`
-Multiplexer.prototype.wantFeeds = function (keys) {
+Multiplexer.prototype.requestFeeds = function (keys) {
   keys = extractKeys(keys)
+  this._requestedFeeds = this._requestedFeeds.concat(keys)
   debug('[REPLICATION] Sending feeds request', keys)
   this._feed.extension(REQUEST_FEEDS, Buffer.from(JSON.stringify(keys)))
-  this._localWant = keys
-  this._initRepl()
 }
 
-
-// this method is expected to be called twice, and will trigger
-// the 'replicate' event when both local and remote 'wants' are available.
-// calculating a sorted common denominator between both wants and availablility which
-// should result in two identical arrays being built on both ends using algorithm:
-//
-// formula:  feedsToReplicate = (lWant - (lWant - rHave)) + (rWant - (rWant - lHave ))
-//
-// The result honors that each node only shares what it offers and does not receive feeds that it didn't ask for.
-Multiplexer.prototype._initRepl = function() {
+Multiplexer.prototype._requestHandler = function (keys) {
   var self = this
-  if(!this._localWant || !this._remoteWants) return
+  var filtered = keys.filter(function(key) {
+    if (self._localOffer.indexOf(key) === -1) {
+      debug('[REPLICATION] Warning, remote requested feed that is not in offer', key)
+      return false
+    }
 
-  // the 'have' arrays might be null, It means that a client might not want
-  // to share anything, and we can silently respect that.
+    // All good, we accept the key request
+    return true
+  })
+  filtered = uniq(filtered)
+  // Tell remote which keys we will replicate
+  debug('[REPLICATION] Sending REPLICICATE_FEEDS')
+  this._feed.extension(REPLICATE_FEEDS, Buffer.from(JSON.stringify(filtered)))
 
-  var sending = self._remoteWants.filter(function(k) {
-    return (self._localHave || []).indexOf(k) !== -1
+  // Start replicating as promised.
+  this._replicateFeeds(filtered)
+}
+
+Multiplexer.prototype._onRemoteReplicate = function (keys) {
+  var self = this
+  var filtered = keys.filter(function(key) {
+    return self._requestedFeeds.indexOf(key) !== -1
   })
 
-  var receiving = self._localWant.filter(function(k){
-    return (self._remoteHas || []).indexOf(k) !== -1
-  })
+  // Start replicating as requested.
+  this._replicateFeeds(filtered)
+}
 
-  // Concat sending and receiveing; produce sorted array with no duplicates
-  var keys = sending.concat(receiving)
-    .reduce(function(arr, key){ // remove duplicates
-      if (arr.indexOf(key) === -1) arr.push(key)
-      return arr
-    }, [])
-    .sort() // sort
-
-  debug('[REPLICATION] _initRepl', keys.length, keys)
-
-  // End immedietly if there's nothing to replicate.
-  if (!this._opts.live && keys.length === 0) return this._finalize()
+// Initializes new replication streams for feeds and joins their streams into
+// the main stream.
+Multiplexer.prototype._replicateFeeds = function(keys) {
+  var self = this
+  keys = uniq(keys)
+  debug('[REPLICATION] _replicateFeeds', keys.length, keys)
 
   this.emit('replicate',  keys, startFeedReplication)
 
@@ -192,27 +193,51 @@ Multiplexer.prototype._initRepl = function() {
 
   function startFeedReplication(feeds){
     if (!Array.isArray(feeds)) feeds = [feeds]
-    self.stream.expectedFeeds = feeds.length
+    self.stream.expectedFeeds += feeds.length
 
     // only the feeds passed to `feeds` option will be replicated (sent or received)
     // hypercore-protocol has built in protection against receiving unexpected/not asked for data.
     feeds.forEach(function(feed) {
-      feed.ready(function() { // wait for each to be ready before replicating.
-        debug('[REPLICATION] replicating feed:', feed.key.toString('hex'))
-        feed.replicate(Object.assign({}, {
+      feed.ready(function() { // wait for each feed to be ready before replicating.
+        var hexKey = feed.key.toString('hex');
+
+        // prevent a feed from being folded into the main stream twice.
+        if (typeof self._activeFeedStreams[hexKey] !== 'undefined') {
+          debug('[REPLICATION] warning! Prevented duplicate replication of: ', hexKey)
+          // decrease the expectedFeeds that was unconditionally increased
+          self.stream.expectedFeeds.length--
+          return
+        }
+
+        debug('[REPLICATION] replicating feed:', hexKey)
+        var fStream = feed.replicate(Object.assign({}, {
           live: self._opts.live,
           download: self._opts.download,
           upload: self._opts.upload,
           encrypt: self._opts.encrypt,
           stream: self.stream
         }))
+
+        // Store reference to this particular feed stream
+        self._activeFeedStreams[hexKey] = fStream
+        var cleanup = function(err, res) {
+          if (!self._activeFeedStreams[hexKey]) return
+          // delete feed stream reference
+          delete self._activeFeedStreams[hexKey]
+          debug("[REPLICATION] feedStream closed:", hexKey.substr(0,8))
+        }
+        fStream.once('end', cleanup)
+        fStream.once('error', cleanup)
       })
     })
   }
 }
 
+Multiplexer.prototype.knownFeeds = function () {
+  return this._localOffer.concat(this._remoteOffer)
+}
+
 module.exports = Multiplexer
-module.exports.SupportedExtensions = SupportedExtensions
 
 // String, String -> Boolean
 function compatibleVersions (v1, v2) {
@@ -230,3 +255,11 @@ function extractKeys (keys) {
   })
     .filter(function(o) { return !!o }) // remove invalid entries
 }
+
+function uniq (arr) {
+  return Object.keys(arr.reduce(function(m, i) {
+    m[i]=true
+    return m
+  }, {})).sort()
+}
+

@@ -189,7 +189,7 @@ Multifeed.prototype.replicate = function (opts) {
 
   // Add key exchange listener
   mux.on('manifest', function(m) {
-    mux.wantFeeds(m.keys)
+    mux.requestFeeds(m.keys)
   })
 
   // Add replication listener
@@ -213,18 +213,19 @@ Multifeed.prototype.replicate = function (opts) {
     if (mux.stream.destroyed) return
     mux.ready(function(){
       var keys = values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
-      mux.haveFeeds(keys)
+      mux.offerFeeds(keys)
     })
 
-    if(opts.live) {
-      // Push session to _streams array
-      self._streams.push(mux)
+    // Push session to _streams array
+    self._streams.push(mux)
 
-      // Register removal
-      mux.stream.on('end', function(err) {
-        self._streams.splice(self._streams.indexOf(mux), 1)
-      })
+    // Register removal
+    var cleanup = function(err) {
+      self._streams.splice(self._streams.indexOf(mux), 1)
+      debug('[REPLICATION] Client connection destroyed', err)
     }
+    mux.stream.on('end', cleanup)
+    mux.stream.on('error', cleanup)
   })
 
   return mux.stream
@@ -280,11 +281,13 @@ Multifeed.prototype._forwardLiveFeedAnnouncements = function (feed, name) {
   if (!this._streams.length) return // no-op if no live-connections
   var self = this
   var hexKey = feed.key.toString('hex');
-  // Tell each remote that we have a new key available if unless they already have it.
+  // Tell each remote that we have a new key available unless
+  // it's already being replicated
   this._streams.forEach(function(mux) {
-    if (mux._remoteHas.indexOf(hexKey) === -1) {
-      debug("Forwarding new feed to existing peers:", hexKey)
-      mux.haveFeeds([hexKey])
+    if (mux.knownFeeds().indexOf(hexKey) === -1) {
+      self._streams
+      debug("Forwarding new feed to existing peer:", hexKey)
+      mux.offerFeeds([hexKey])
     }
   })
 }
