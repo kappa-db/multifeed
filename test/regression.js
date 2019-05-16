@@ -161,7 +161,7 @@ test('regression: start replicating before feeds are loaded', function (t) {
 })
 
 test('regression: announce new feed on existing connections', function(t) {
-  t.plan(19);
+  t.plan(21);
   var m1 = multifeed(hypercore, ram, { valueEncoding: 'json' })
   var m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })
   var m3 = multifeed(hypercore, ram, { valueEncoding: 'json' })
@@ -178,14 +178,20 @@ test('regression: announce new feed on existing connections', function(t) {
             feedsReplicated++
             switch(feedsReplicated) {
               case 1: // First we should see M2's writer
-                t.equals(entry, "Second", "m2's writer should have been replicated")
+                m2.writer('local', function(err, w) {
+                  t.equal(feed.key.toString('hex'), w.key.toString('hex'), "should see m2's writer")
+                  t.equals(entry, "Second", "m2's writer should have been replicated")
+                })
                 break;
               case 2:
-                t.equals(entry, "Third", "m3's writer should have been forwarded via m2")
-                // close active streams and end the test.
-                r1.end()
-                r2.end()
-                t.end()
+                m3.writer('local', function(err, w) {
+                  t.equal(feed.key.toString('hex'), w.key.toString('hex'), "should see m3's writer")
+                  t.equals(entry, "Third", "m3's writer should have been forwarded via m2")
+                  // close active streams and end the test.
+                  r1.end()
+                  r2.end()
+                  t.end()
+                })
                 break;
               default:
                 t.ok(false, "Only expected to see 2 feed events, got: " + feedsReplicated)
@@ -206,7 +212,7 @@ test('regression: announce new feed on existing connections', function(t) {
   })
 
   function setup (m, buf, cb) {
-    m.writer(function (err, w) {
+    m.writer('local', function (err, w) {
       t.error(err)
       w.append(buf, function (err) {
         t.error(err)
