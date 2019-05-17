@@ -4,6 +4,7 @@ var events = require('events')
 var inherits = require('inherits')
 var readyify = require('./ready')
 var mutexify = require('mutexify')
+var through = require('through2')
 var debug = require('debug')('multifeed')
 var multiplexer = require('./mux')
 
@@ -181,6 +182,13 @@ Multifeed.prototype.feed = function (key) {
 }
 
 Multifeed.prototype.replicate = function (opts) {
+  if (!this._fake) {
+    var tmp = through()
+    process.nextTick(function () {
+      tmp.emit('error', new Error('tried to use "replicate" before multifeed is ready'))
+    })
+    return tmp
+  }
   if (!opts) opts = {}
   var self = this
   var mux = multiplexer(self._fake.key, opts)
