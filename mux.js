@@ -63,7 +63,11 @@ function Multiplexer (key, opts) {
       self._finalize(new Error('Client mismatch! expected ' + MULTIFEED + ' but got ' + header.client))
       return
     }
-    self.emit('ready', header)
+
+    // Wait a tick, otherwise the _ready handler below won't be listening for this event yet.
+    process.nextTick(function () {
+      self.emit('ready', header)
+    })
   })
 
   feed.on('extension', function (type, message) {
