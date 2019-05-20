@@ -20,6 +20,7 @@ var SupportedExtensions = [
 // `opts`- hypercore-protocol opts
 function Multiplexer (key, opts) {
   if (!(this instanceof Multiplexer)) return new Multiplexer(key, opts)
+  opts = opts || {}
   this._id = opts._id || Math.floor(Math.random() * 1000).toString(16)
   debug(this._id + ' [REPLICATION] New mux initialized', key.toString('hex'), opts)
   var self = this
