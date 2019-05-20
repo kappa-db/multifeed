@@ -12,6 +12,7 @@ module.exports = Multifeed
 
 function Multifeed (hypercore, storage, opts) {
   if (!(this instanceof Multifeed)) return new Multifeed(hypercore, storage, opts)
+  this._id = opts._id || Math.floor(Math.random() * 1000).toString(16)  // for debugging
   this._feeds = {}
   this._feedKeyToFeed = {}
 
@@ -39,14 +40,14 @@ function Multifeed (hypercore, storage, opts) {
     // replication.
     var protocolEncryptionKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
     if (self._opts.key) protocolEncryptionKey = Buffer.from(self._opts.key)
-    else debug('Warning, running multifeed with unsecure default key')
+    else debug(self._id + ' Warning, running multifeed with unsecure default key')
 
     var feed = hypercore(self._storage('_fake'), protocolEncryptionKey)
 
     feed.ready(function () {
       self._fake = feed
       self._loadFeeds(function () {
-        debug('[INIT] finished loading feeds')
+        debug(self._id + ' [INIT] finished loading feeds')
         done()
       })
     })
@@ -101,7 +102,7 @@ Multifeed.prototype._loadFeeds = function (cb) {
   // Hypercores are stored starting at 0 and incrementing by 1. A failed read
   // at position 0 implies non-existance of the hypercore.
   function next (n) {
-    debug('[INIT] loading feed #' + n)
+    debug(self._id + ' [INIT] loading feed #' + n)
     var storage = self._storage(''+n)
     var st = storage('key')
     st.read(0, 4, function (err) {
@@ -140,7 +141,7 @@ Multifeed.prototype.writer = function (name, cb) {
       return
     }
 
-    debug('[WRITER] creating new writer: ' + name)
+    debug(self._id + ' [WRITER] creating new writer: ' + name)
 
     self.writerLock(function (release) {
       var len = Object.keys(self._feeds).length
@@ -189,6 +190,7 @@ Multifeed.prototype.replicate = function (opts) {
     })
     return tmp
   }
+
   if (!opts) opts = {}
   var self = this
   var mux = multiplexer(self._fake.key, opts)
@@ -203,11 +205,13 @@ Multifeed.prototype.replicate = function (opts) {
     addMissingKeys(keys, function(err){
       if(err) return mux.destroy(err)
 
+      // Q(noffle): why do this?
       var key2feed = values(self._feeds).reduce(function(h,feed){
         h[feed.key.toString('hex')] = feed
         return h
       },{})
 
+      // Q(noffle): does order matter to hypercore-protocol?
       var feeds = keys.map(function(k){ return key2feed[k] })
       repl(feeds)
     })
@@ -240,7 +244,7 @@ Multifeed.prototype.replicate = function (opts) {
 
   function addMissingKeysLocked (keys, cb) {
     var pending = 0
-    debug('[REPLICATION] recv\'d ' + keys.length + ' keys')
+    debug(self._id + ' [REPLICATION] recv\'d ' + keys.length + ' keys')
     var filtered = keys.filter(function (key) {
       return !Number.isNaN(parseInt(key, 16)) && key.length === 64
     })
@@ -254,14 +258,14 @@ Multifeed.prototype.replicate = function (opts) {
         var storage = self._storage(''+numFeeds)
         var feed
         try {
-          debug('[REPLICATION] trying to create new local hypercore, key=' + key.toString('hex'))
+          debug(self._id + ' [REPLICATION] trying to create new local hypercore, key=' + key.toString('hex'))
           feed = self._hypercore(storage, Buffer.from(key, 'hex'), self._opts)
         } catch (e) {
-          debug('[REPLICATION] failed to create new local hypercore, key=' + key.toString('hex'))
+          debug(self._id + ' [REPLICATION] failed to create new local hypercore, key=' + key.toString('hex'))
           if (!--pending) cb()
           return
         }
-        debug('[REPLICATION] succeeded in creating new local hypercore, key=' + key.toString('hex'))
+        debug(self._id + ' [REPLICATION] succeeded in creating new local hypercore, key=' + key.toString('hex'))
         self._addFeed(feed, String(numFeeds))
         feed.ready(function () {
           if (!--pending) cb()
