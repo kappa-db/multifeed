@@ -226,3 +226,16 @@ test('regression: announce new feed on existing connections', function(t) {
     })
   }
 })
+
+test('regression: replicate before multifeed is ready', function (t) {
+  t.plan(1)
+
+  var storage = tmp()
+  var key
+
+  var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
+  var res = multi.replicate()
+  res.on('error', function () {
+    t.ok('error hit')
+  })
+})

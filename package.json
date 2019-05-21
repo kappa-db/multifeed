@@ -2,7 +2,7 @@
   "name": "multifeed",
   "description": "multi-writer hypercore",
   "author": "Stephen Whitmore <sww@eight.net>",
-  "version": "3.0.3",
+  "version": "3.0.6",
   "repository": {
     "url": "git://github.com/noffle/multifeed.git"
   },
@@ -19,7 +19,8 @@
     "hypercore-protocol": "^6.8.0",
     "inherits": "^2.0.3",
     "mutexify": "^1.2.0",
-    "random-access-file": "^2.0.1"
+    "random-access-file": "^2.0.1",
+    "through2": "^3.0.0"
   },
   "devDependencies": {
     "hypercore": "^6.18.1",
@@ -28,7 +29,6 @@
     "rimraf": "^2.6.3",
     "standard": "~10.0.0",
     "tape": "~4.6.2",
-    "through2": "^3.0.0",
     "tmp": "0.0.33"
   },
   "license": "ISC"

@@ -3,7 +3,6 @@ var readify = require('./ready')
 var inherits = require('inherits')
 var events = require('events')
 var debug = require('debug')('multifeed')
-var hypercore = require('hypercore')
 
 // constants
 var MULTIFEED = 'MULTIFEED'
@@ -23,9 +22,10 @@ var SupportedExtensions = [
 // `opts`- hypercore-protocol opts
 function Multiplexer (key, opts) {
   if (!(this instanceof Multiplexer)) return new Multiplexer(key, opts)
-  debug('[REPLICATION] New mux initialized', key.toString('hex'), opts)
   var self = this
   self._opts = opts = opts || {}
+  this._id = opts._id || Math.floor(Math.random() * 1000).toString(16)
+  debug(this._id + ' [REPLICATION] New mux initialized', key.toString('hex'), opts)
 
   // initialize
   self._localOffer = []
@@ -50,28 +50,32 @@ function Multiplexer (key, opts) {
     try {
       header = JSON.parse(this.userData.toString('utf8'))
     } catch (err) {
-      debug('[REPLICATION] Failed parsing JSON header', err)
+      debug(self._id + ' [REPLICATION] Failed parsing JSON handshake', err)
       self._finalize(err)
       return
     }
-    debug('[REPLICATION] recv\'d header: ', JSON.stringify(header))
+    debug(self._id + ' [REPLICATION] recv\'d handshake: ', JSON.stringify(header))
     if (!compatibleVersions(header.version, PROTOCOL_VERSION)) {
-      debug('[REPLICATION] aborting; version mismatch (us='+PROTOCOL_VERSION+')')
+      debug(self._id + ' [REPLICATION] aborting; version mismatch (us='+PROTOCOL_VERSION+')')
       self._finalize(new Error('protocol version mismatch! us='+PROTOCOL_VERSION + ' them=' + header.version))
       return
     }
 
     if (header.client != MULTIFEED) {
-      debug('[REPLICATION] aborting; Client mismatch! expected ', MULTIFEED, 'but got', header.client)
+      debug(self._id + ' [REPLICATION] aborting; Client mismatch! expected ', MULTIFEED, 'but got', header.client)
       self._finalize(new Error('Client mismatch! expected ' + MULTIFEED + ' but got ' + header.client))
       return
     }
-    self.emit('ready', header)
+
+    // Wait a tick, otherwise the _ready handler below won't be listening for this event yet.
+    process.nextTick(function () {
+      self.emit('ready', header)
+    })
   })
 
   feed.on('extension', function (type, message) {
     try {
-      debug('Extension:', type, message.toString('utf8'))
+      debug(self._id + 'Extension:', type, message.toString('utf8'))
       var data = JSON.parse(message.toString('utf8'))
       switch(type) {
         case MANIFEST:
@@ -95,15 +99,14 @@ function Multiplexer (key, opts) {
 
   if (!self._opts.live ) {
     self.stream.on('prefinalize', function(cb){
-      debug('[REPLICATION] feed finish/prefinalize', self.stream.expectedFeeds)
+      debug(self._id + ' [REPLICATION] feed finish/prefinalize', self.stream.expectedFeeds)
       cb()
     })
   }
 
-
   this._ready = readify(function (done) {
     self.on('ready', function(remote){
-      debug('[REPLICATION] remote connected and ready')
+      debug(self._id + ' [REPLICATION] remote connected and ready')
       done(remote)
     })
   })
@@ -117,11 +120,11 @@ Multiplexer.prototype.ready = function(cb) {
 
 Multiplexer.prototype._finalize = function(err) {
   if (err) {
-    debug('[REPLICATION] destroyed due to', err)
+    debug(this._id + ' [REPLICATION] destroyed due to', err)
     this.emit('error', err)
     this.stream.destroy(err)
   } else {
-    debug('[REPLICATION] finalized', err)
+    debug(this._id + ' [REPLICATION] finalized', err)
     this.stream.finalize()
   }
 }
@@ -135,8 +138,7 @@ Multiplexer.prototype.offerFeeds = function (keys, opts) {
   var manifest = Object.assign(opts || {}, {
     keys: extractKeys(keys)
   })
-
-  debug('[REPLICATON] sending manifest: ', manifest)
+  debug(this._id + ' [REPLICATON] sending manifest:', manifest)
   this._localOffer = this._localOffer.concat(manifest.keys)
   this._feed.extension(MANIFEST, Buffer.from(JSON.stringify(manifest)))
 }
@@ -146,7 +148,7 @@ Multiplexer.prototype.offerFeeds = function (keys, opts) {
 Multiplexer.prototype.requestFeeds = function (keys) {
   keys = extractKeys(keys)
   this._requestedFeeds = this._requestedFeeds.concat(keys)
-  debug('[REPLICATION] Sending feeds request', keys)
+  debug(this._id + ' [REPLICATION] Sending feeds request', keys)
   this._feed.extension(REQUEST_FEEDS, Buffer.from(JSON.stringify(keys)))
 }
 
@@ -185,9 +187,9 @@ Multiplexer.prototype._onRemoteReplicate = function (keys) {
 Multiplexer.prototype._replicateFeeds = function(keys) {
   var self = this
   keys = uniq(keys)
-  debug('[REPLICATION] _replicateFeeds', keys.length, keys)
+  debug(this._id + '[REPLICATION] _replicateFeeds', keys.length, keys)
 
-  this.emit('replicate',  keys, startFeedReplication)
+  this.emit('replicate', keys, startFeedReplication)
 
   return keys
 
@@ -203,13 +205,13 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
 
         // prevent a feed from being folded into the main stream twice.
         if (typeof self._activeFeedStreams[hexKey] !== 'undefined') {
-          debug('[REPLICATION] warning! Prevented duplicate replication of: ', hexKey)
+          debug(self._id + '[REPLICATION] warning! Prevented duplicate replication of: ', hexKey)
           // decrease the expectedFeeds that was unconditionally increased
           self.stream.expectedFeeds.length--
           return
         }
 
-        debug('[REPLICATION] replicating feed:', hexKey)
+        debug(self._id + '[REPLICATION] replicating feed:', hexKey)
         var fStream = feed.replicate(Object.assign({}, {
           live: self._opts.live,
           download: self._opts.download,
@@ -224,7 +226,7 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
           if (!self._activeFeedStreams[hexKey]) return
           // delete feed stream reference
           delete self._activeFeedStreams[hexKey]
-          debug("[REPLICATION] feedStream closed:", hexKey.substr(0,8))
+          debug(self._id + "[REPLICATION] feedStream closed:", hexKey.substr(0,8))
         }
         fStream.once('end', cleanup)
         fStream.once('error', cleanup)
