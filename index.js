@@ -101,13 +101,17 @@ Multifeed.prototype._loadFeeds = function (cb) {
 
   // Hypercores are stored starting at 0 and incrementing by 1. A failed read
   // at position 0 implies non-existance of the hypercore.
+  var pending = 0
   function next (n) {
-    debug(self._id + ' [INIT] loading feed #' + n)
     var storage = self._storage(''+n)
+    debug(self._id + ' [INIT] loading feed #' + n)
     var st = storage('key')
     st.read(0, 4, function (err) {
-      if (err) return cb()
+      pending++
+      if (err) return done()  // means there are no more feeds to read
       var feed = self._hypercore(storage, self._opts)
+      process.nextTick(next, n + 1)
+
       feed.ready(function () {
         readStringFromStorage(storage('localname'), function (err, name) {
           if (!err && name) {
@@ -116,12 +120,21 @@ Multifeed.prototype._loadFeeds = function (cb) {
             self._addFeed(feed, String(n))
           }
           st.close(function (err) {
-            if (err) return cb(err)
-            next(n+1)
+            if (err) return done(err)
+            debug(self._id + ' [INIT] loaded feed #' + n)
+            done()
           })
         })
       })
     })
+  }
+
+  function done (err) {
+    if (err) {
+      pending = Infinity
+      return cb(err)
+    }
+    if (!--pending) cb()
   }
 
   next(0)
