@@ -12,7 +12,7 @@ module.exports = Multifeed
 
 function Multifeed (hypercore, storage, opts) {
   if (!(this instanceof Multifeed)) return new Multifeed(hypercore, storage, opts)
-  this._id = opts._id || Math.floor(Math.random() * 1000).toString(16)  // for debugging
+  this._id = (opts||{})._id || Math.floor(Math.random() * 1000).toString(16)  // for debugging
   this._feeds = {}
   this._feedKeyToFeed = {}
 
