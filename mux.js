@@ -139,7 +139,7 @@ Multiplexer.prototype.offerFeeds = function (keys, opts) {
     keys: extractKeys(keys)
   })
   debug(this._id + ' [REPLICATON] sending manifest:', manifest)
-  this._localOffer = this._localOffer.concat(manifest.keys)
+  manifest.keys.forEach(function (key) { this._localOffer.push(key) }.bind(this))
   this._feed.extension(MANIFEST, Buffer.from(JSON.stringify(manifest)))
 }
 
@@ -147,7 +147,7 @@ Multiplexer.prototype.offerFeeds = function (keys, opts) {
 // for classical multifeed `ACCEPT_ALL` behaviour both parts must call `want(remoteHas)`
 Multiplexer.prototype.requestFeeds = function (keys) {
   keys = extractKeys(keys)
-  this._requestedFeeds = this._requestedFeeds.concat(keys)
+  keys.forEach(function (k) { this._requestedFeeds.push(k) }.bind(this))
   debug(this._id + ' [REPLICATION] Sending feeds request', keys)
   this._feed.extension(REQUEST_FEEDS, Buffer.from(JSON.stringify(keys)))
 }
@@ -201,13 +201,13 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
     // hypercore-protocol has built in protection against receiving unexpected/not asked for data.
     feeds.forEach(function(feed) {
       feed.ready(function() { // wait for each feed to be ready before replicating.
-        var hexKey = feed.key.toString('hex');
+        var hexKey = feed.key.toString('hex')
 
         // prevent a feed from being folded into the main stream twice.
         if (typeof self._activeFeedStreams[hexKey] !== 'undefined') {
           debug(self._id + '[REPLICATION] warning! Prevented duplicate replication of: ', hexKey)
           // decrease the expectedFeeds that was unconditionally increased
-          self.stream.expectedFeeds.length--
+          self.stream.expectedFeeds--
           return
         }
 
@@ -222,6 +222,7 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
 
         // Store reference to this particular feed stream
         self._activeFeedStreams[hexKey] = fStream
+
         var cleanup = function(err, res) {
           if (!self._activeFeedStreams[hexKey]) return
           // delete feed stream reference
@@ -250,7 +251,7 @@ function compatibleVersions (v1, v2) {
 
 function extractKeys (keys) {
   if (!Array.isArray(keys)) keys = [keys]
-  return keys = keys.map(function(o) {
+  return keys.map(function(o) {
     if (typeof o === 'string') return o
     if (typeof o === 'object' && o.key) return o.key.toString('hex')
     if (o instanceof Buffer) return o.toString('utf8')

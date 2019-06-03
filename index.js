@@ -198,26 +198,29 @@ Multifeed.prototype.replicate = function (opts) {
   var mux = multiplexer(self._fake.key, opts)
 
   // Add key exchange listener
-  mux.on('manifest', function(m) {
+  var onManifest = function (m) {
     mux.requestFeeds(m.keys)
-  })
+  }
+  mux.on('manifest', onManifest)
 
   // Add replication listener
-  mux.on('replicate', function(keys, repl) {
-    addMissingKeys(keys, function(err){
-      if(err) return mux.destroy(err)
+  var onReplicate = function (keys, repl) {
+    addMissingKeys(keys, function (err) {
+      if (err) return mux.destroy(err)
 
-      // Q(noffle): why do this?
-      var key2feed = values(self._feeds).reduce(function(h,feed){
+      // Create a look up table with feed-keys as keys
+      // (since not all keys in self._feeds are actual feed-keys)
+      var key2feed = values(self._feeds).reduce(function (h, feed) {
         h[feed.key.toString('hex')] = feed
         return h
-      },{})
+      }, {})
 
-      // Q(noffle): does order matter to hypercore-protocol?
-      var feeds = keys.map(function(k){ return key2feed[k] })
+      // Select feeds by key from LUT
+      var feeds = keys.map(function (k) { return key2feed[k] })
       repl(feeds)
     })
-  })
+  }
+  mux.on('replicate', onReplicate)
 
   // Start streaming
   this.ready(function(err){
@@ -232,12 +235,14 @@ Multifeed.prototype.replicate = function (opts) {
     self._streams.push(mux)
 
     // Register removal
-    var cleanup = function(err) {
+    var cleanup = function (err) {
+      mux.removeListener('manifest', onManifest)
+      mux.removeListener('replicate', onReplicate)
       self._streams.splice(self._streams.indexOf(mux), 1)
       debug('[REPLICATION] Client connection destroyed', err)
     }
-    mux.stream.on('end', cleanup)
-    mux.stream.on('error', cleanup)
+    mux.stream.once('end', cleanup)
+    mux.stream.once('error', cleanup)
   })
 
   return mux.stream
