@@ -160,6 +160,73 @@ test('regression: start replicating before feeds are loaded', function (t) {
   }
 })
 
+test('regression: announce new feed on existing connections', function(t) {
+  t.plan(21);
+  var m1 = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var m3 = multifeed(hypercore, ram, { valueEncoding: 'json' })
+
+  setup(m1, "First", function() {
+    setup(m2, "Second", function() {
+      setup(m3, "Third", function() {
+        var feedsReplicated = 0;
+        var r1 = null, r2 = null; // forward declare replication streams.
+
+        m1.on('feed', function(feed, name) {
+          feed.get(0, function(err, entry) {
+            t.error(err)
+            feedsReplicated++
+            switch(feedsReplicated) {
+              case 1: // First we should see M2's writer
+                m2.writer('local', function(err, w) {
+                  t.equal(feed.key.toString('hex'), w.key.toString('hex'), "should see m2's writer")
+                  t.equals(entry, "Second", "m2's writer should have been replicated")
+                })
+                break;
+              case 2:
+                m3.writer('local', function(err, w) {
+                  t.equal(feed.key.toString('hex'), w.key.toString('hex'), "should see m3's writer")
+                  t.equals(entry, "Third", "m3's writer should have been forwarded via m2")
+                  // close active streams and end the test.
+                  r1.end()
+                  r2.end()
+                  t.end()
+                })
+                break;
+              default:
+                t.ok(false, "Only expected to see 2 feed events, got: " + feedsReplicated)
+            }
+          })
+        })
+
+        // m1 and m2 are now live connected.
+        r1 = m1.replicate({live: true})
+        r1.pipe(m2.replicate({live: true})).pipe(r1)
+
+        // When m3 is attached to m2, m2 should forward m3's writer to m1.
+        r2 = m3.replicate({live:true})
+        r2.pipe(m2.replicate({live:true})).pipe(r2)
+
+      })
+    })
+  })
+
+  function setup (m, buf, cb) {
+    m.writer('local', function (err, w) {
+      t.error(err)
+      w.append(buf, function (err) {
+        t.error(err)
+        w.get(0, function (err, data) {
+          t.error(err)
+          t.equals(data, buf)
+          t.deepEquals(m.feeds(), [w])
+          cb()
+        })
+      })
+    })
+  }
+})
+
 test('regression: replicate before multifeed is ready', function (t) {
   t.plan(1)
 

@@ -15,6 +15,7 @@ function Multifeed (hypercore, storage, opts) {
   this._id = (opts||{})._id || Math.floor(Math.random() * 1000).toString(16)  // for debugging
   this._feeds = {}
   this._feedKeyToFeed = {}
+  this._streams = []
 
   this._hypercore = hypercore
   this._opts = opts
@@ -61,6 +62,7 @@ Multifeed.prototype._addFeed = function (feed, name) {
   this._feedKeyToFeed[feed.key.toString('hex')] = feed
   feed.setMaxListeners(256)
   this.emit('feed', feed, name)
+  this._forwardLiveFeedAnnouncements(feed, name)
 }
 
 Multifeed.prototype.ready = function (cb) {
@@ -209,26 +211,29 @@ Multifeed.prototype.replicate = function (opts) {
   var mux = multiplexer(self._fake.key, opts)
 
   // Add key exchange listener
-  mux.once('manifest', function(m) {
-    mux.wantFeeds(m.keys)
-  })
+  var onManifest = function (m) {
+    mux.requestFeeds(m.keys)
+  }
+  mux.on('manifest', onManifest)
 
   // Add replication listener
-  mux.once('replicate', function(keys, repl) {
-    addMissingKeys(keys, function(err){
-      if(err) return mux.destroy(err)
+  var onReplicate = function (keys, repl) {
+    addMissingKeys(keys, function (err) {
+      if (err) return mux.destroy(err)
 
-      // Q(noffle): why do this?
-      var key2feed = values(self._feeds).reduce(function(h,feed){
+      // Create a look up table with feed-keys as keys
+      // (since not all keys in self._feeds are actual feed-keys)
+      var key2feed = values(self._feeds).reduce(function (h, feed) {
         h[feed.key.toString('hex')] = feed
         return h
-      },{})
+      }, {})
 
-      // Q(noffle): does order matter to hypercore-protocol?
-      var feeds = keys.map(function(k){ return key2feed[k] })
+      // Select feeds by key from LUT
+      var feeds = keys.map(function (k) { return key2feed[k] })
       repl(feeds)
     })
-  })
+  }
+  mux.on('replicate', onReplicate)
 
   // Start streaming
   this.ready(function(err){
@@ -236,8 +241,21 @@ Multifeed.prototype.replicate = function (opts) {
     if (mux.stream.destroyed) return
     mux.ready(function(){
       var keys = values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
-      mux.haveFeeds(keys)
+      mux.offerFeeds(keys)
     })
+
+    // Push session to _streams array
+    self._streams.push(mux)
+
+    // Register removal
+    var cleanup = function (err) {
+      mux.removeListener('manifest', onManifest)
+      mux.removeListener('replicate', onReplicate)
+      self._streams.splice(self._streams.indexOf(mux), 1)
+      debug('[REPLICATION] Client connection destroyed', err)
+    }
+    mux.stream.once('end', cleanup)
+    mux.stream.once('error', cleanup)
   })
 
   return mux.stream
@@ -287,6 +305,21 @@ Multifeed.prototype.replicate = function (opts) {
     })
     if (!pending) cb()
   }
+}
+
+Multifeed.prototype._forwardLiveFeedAnnouncements = function (feed, name) {
+  if (!this._streams.length) return // no-op if no live-connections
+  var self = this
+  var hexKey = feed.key.toString('hex');
+  // Tell each remote that we have a new key available unless
+  // it's already being replicated
+  this._streams.forEach(function(mux) {
+    if (mux.knownFeeds().indexOf(hexKey) === -1) {
+      self._streams
+      debug("Forwarding new feed to existing peer:", hexKey)
+      mux.offerFeeds([hexKey])
+    }
+  })
 }
 
 // TODO: what if the new data is shorter than the old data? things will break!
