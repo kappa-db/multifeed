@@ -108,14 +108,14 @@ Multifeed.prototype._loadFeeds = function (cb) {
 
   // Hypercores are stored starting at 0 and incrementing by 1. A failed read
   // at position 0 implies non-existance of the hypercore.
-  var pending = 0
+  var pending = 1
   function next (n) {
     var storage = self._storage(''+n)
     debug(self._id + ' [INIT] loading feed #' + n)
     var st = storage('key')
     st.read(0, 4, function (err) {
-      pending++
       if (err) return done()  // means there are no more feeds to read
+      pending++
       var feed = self._hypercore(storage, self._opts)
       process.nextTick(next, n + 1)
 
