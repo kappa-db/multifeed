@@ -47,7 +47,12 @@ function Multifeed (hypercore, storage, opts) {
 
     feed.ready(function () {
       self._fake = feed
-      self._loadFeeds(function () {
+      self._loadFeeds(function (err) {
+        if (err) {
+          debug(self._id + ' [INIT] failed to load feeds: ' + err.message)
+          self.emit('error', err)
+          return
+        }
         debug(self._id + ' [INIT] finished loading feeds')
         done()
       })
