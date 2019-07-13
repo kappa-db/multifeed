@@ -198,7 +198,7 @@ Multifeed.prototype.feeds = function () {
 
 Multifeed.prototype.feed = function (key) {
   if (Buffer.isBuffer(key)) key = key.toString('hex')
-  if (typeof key === 'string') return this._feedKeyToFeed[key]
+  if (typeof key === 'string') return this._feedKeyToFeed[key] || this._feeds[key] || null
   else return null
 }
 
