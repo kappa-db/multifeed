@@ -165,7 +165,7 @@ Multiplexer.prototype._requestHandler = function (keys) {
   })
   filtered = uniq(filtered)
   // Tell remote which keys we will replicate
-  debug('[REPLICATION] Sending REPLICICATE_FEEDS')
+  debug('[REPLICATION] Sending REPLICATE_FEEDS')
   this._feed.extension(REPLICATE_FEEDS, Buffer.from(JSON.stringify(filtered)))
 
   // Start replicating as promised.
