@@ -13,9 +13,11 @@ var MANIFEST = 'MANIFEST'
 var REQUEST_FEEDS = 'REQUEST_FEEDS'
 var REPLICATE_FEEDS = 'REPLICATE_FEEDS'
 
+// XXX: hypercore-protocol currently requires extensions be specified in
+// alphabetical order.
 var SupportedExtensions = [
   MANIFEST,
-  REPLICATE_FEEDS, // <-- bug in hyperprotocol? extension is never fired if declared last
+  REPLICATE_FEEDS,
   REQUEST_FEEDS
 ]
 // `key` - protocol encryption key
