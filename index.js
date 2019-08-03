@@ -292,8 +292,10 @@ Multifeed.prototype.replicate = function (opts) {
         return feed.key.toString('hex') === key
       })
       if (!feeds.length) {
+        var myKey = String(keyId)
+        var storage = self._storage(keyId)
+        keyId++
         pending++
-        var storage = self._storage(''+numFeeds)
         var feed
         try {
           debug(self._id + ' [REPLICATION] trying to create new local hypercore, key=' + key.toString('hex'))
@@ -304,7 +306,7 @@ Multifeed.prototype.replicate = function (opts) {
           return
         }
         feed.ready(function () {
-          self._addFeed(feed, String(keyId))
+          self._addFeed(feed, myKey)
           keyId++
           debug(self._id + ' [REPLICATION] succeeded in creating new local hypercore, key=' + key.toString('hex'))
           if (!--pending) cb()
