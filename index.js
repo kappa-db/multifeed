@@ -284,13 +284,15 @@ Multifeed.prototype.replicate = function (opts) {
     var filtered = keys.filter(function (key) {
       return !Number.isNaN(parseInt(key, 16)) && key.length === 64
     })
+
+    var numFeeds = Object.keys(self._feeds).length
+    var keyId = numFeeds
     filtered.forEach(function (key) {
       var feeds = values(self._feeds).filter(function (feed) {
         return feed.key.toString('hex') === key
       })
       if (!feeds.length) {
         pending++
-        var numFeeds = Object.keys(self._feeds).length
         var storage = self._storage(''+numFeeds)
         var feed
         try {
@@ -301,9 +303,10 @@ Multifeed.prototype.replicate = function (opts) {
           if (!--pending) cb()
           return
         }
-        debug(self._id + ' [REPLICATION] succeeded in creating new local hypercore, key=' + key.toString('hex'))
         feed.ready(function () {
-          self._addFeed(feed, String(Object.keys(self._feeds).length))
+          self._addFeed(feed, String(keyId))
+          keyId++
+          debug(self._id + ' [REPLICATION] succeeded in creating new local hypercore, key=' + key.toString('hex'))
           if (!--pending) cb()
         })
       }
