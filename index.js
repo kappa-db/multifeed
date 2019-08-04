@@ -8,6 +8,7 @@ var through = require('through2')
 var debug = require('debug')('multifeed')
 var multiplexer = require('./mux')
 
+// Key-less constant hypercore to bootstrap hypercore-protocol replication.
 var defaultEncryptionKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
 
 module.exports = Multifeed
@@ -41,8 +42,6 @@ function Multifeed (hypercore, storage, opts) {
 
   var self = this
   this._ready = readyify(function (done) {
-    // Private key-less constant hypercore to bootstrap hypercore-protocol
-    // replication.
     var encryptionKey = defaultEncryptionKey
     if (self._opts.encryptionKey) {
       if (typeof self._opts.encryptionKey === 'string') encryptionKey = Buffer.from(self._opts.encryptionKey, 'hex')
@@ -51,10 +50,10 @@ function Multifeed (hypercore, storage, opts) {
       debug(self._id + ' Warning, running multifeed with unsecure default key')
     }
 
-    var feed = hypercore(self._storage('_fake'), encryptionKey)
+    var feed = hypercore(self._storage('_root'), encryptionKey)
 
     feed.ready(function () {
-      self._fake = feed
+      self._root = feed
       self._loadFeeds(function (err) {
         if (err) {
           debug(self._id + ' [INIT] failed to load feeds: ' + err.message)
@@ -93,12 +92,12 @@ Multifeed.prototype.close = function (cb) {
       })
     }
 
-    var feeds = values(self._feeds).concat(self._fake)
+    var feeds = values(self._feeds).concat(self._root)
 
     function next (n) {
       if (n >= feeds.length) {
         self._feeds = []
-        self._fake = undefined
+        self._root = undefined
         return done()
       }
       feeds[n].close(function (err) {
@@ -211,7 +210,7 @@ Multifeed.prototype.feed = function (key) {
 }
 
 Multifeed.prototype.replicate = function (opts) {
-  if (!this._fake) {
+  if (!this._root) {
     var tmp = through()
     process.nextTick(function () {
       tmp.emit('error', new Error('tried to use "replicate" before multifeed is ready'))
@@ -221,7 +220,7 @@ Multifeed.prototype.replicate = function (opts) {
 
   if (!opts) opts = {}
   var self = this
-  var mux = multiplexer(self._fake.key, opts)
+  var mux = multiplexer(self._root.key, opts)
 
   // Add key exchange listener
   var onManifest = function (m) {

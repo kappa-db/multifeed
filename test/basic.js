@@ -243,7 +243,7 @@ test('can provide custom encryption key', function (t) {
     var multi = multifeed(hypercore, ram, { valueEncoding: 'json', encryptionKey: core.key })
     multi.ready(function () {
       t.same(multi._opts.encryptionKey, core.key, 'encryption key set')
-      t.same(multi._fake.key, core.key, 'fake key set')
+      t.same(multi._root.key, core.key, 'fake key set')
     })
   })
 })
