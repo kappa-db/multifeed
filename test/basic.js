@@ -235,7 +235,7 @@ test('close after double-open', function (t) {
   }
 })
 
-test.only('can provide custom encryption key', function (t) {
+test('can provide custom encryption key', function (t) {
   t.plan(2)
 
   var core = hypercore(ram)
