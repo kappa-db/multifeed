@@ -52,6 +52,10 @@ function Multifeed (hypercore, storage, opts) {
 
     var feed = hypercore(self._storage('_root'), encryptionKey)
 
+    feed.on('error', function (err) {
+      self.emit('error', err)
+    })
+
     feed.ready(function () {
       self._root = feed
       self._loadFeeds(function (err) {
