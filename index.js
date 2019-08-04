@@ -125,10 +125,10 @@ Multifeed.prototype._loadFeeds = function (cb) {
   var pending = 1
   function next (n) {
     var storage = self._storage(''+n)
-    debug(self._id + ' [INIT] loading feed #' + n)
     var st = storage('key')
     st.read(0, 4, function (err) {
       if (err) return done()  // means there are no more feeds to read
+      debug(self._id + ' [INIT] loading feed #' + n)
       pending++
       var feed = self._hypercore(storage, self._opts)
       process.nextTick(next, n + 1)
