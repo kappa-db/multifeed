@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "hypercore": "^6.18.1",
+    "pump": "^3.0.0",
     "pumpify": "^1.5.1",
     "random-access-memory": "^2.4.0",
     "rimraf": "^2.6.3",

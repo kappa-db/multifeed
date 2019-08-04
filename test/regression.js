@@ -3,6 +3,7 @@ var hypercore = require('hypercore')
 var multifeed = require('..')
 var ram = require('random-access-memory')
 var tmp = require('tmp').tmpNameSync
+var pump = require('pump')
 
 test('regression: concurrency of writer creation', function (t) {
   t.plan(3)
@@ -238,4 +239,44 @@ test('regression: replicate before multifeed is ready', function (t) {
   res.on('error', function () {
     t.ok('error hit')
   })
+})
+
+test('regression: MFs with different root keys cannot replicate', function (t) {
+  var core = hypercore(ram)
+  var m1, m2
+
+  core.ready(function () {
+    m1 = multifeed(hypercore, ram, { valueEncoding: 'json', encryptionKey: core.key })
+    m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })  // default encryption key
+
+    setup(m1, 'foo', function () {
+      setup(m2, 'bar', function () {
+        var r = m1.replicate()
+        var s = m2.replicate()
+        pump(r, s, r, function (err) {
+          t.same(err.toString(), 'Error: First shared hypercore must be the same')
+          t.end()
+        })
+      })
+    })
+  })
+
+  function setup (m, buf, cb) {
+    m.writer(function (err, w) {
+      t.error(err)
+      var bufs = []
+      for(var i=0; i < 1000; i++) {
+        bufs.push(buf)
+      }
+      w.append(bufs, function (err) {
+        t.error(err)
+        w.get(13, function (err, data) {
+          t.error(err)
+          t.equals(data, buf)
+          t.deepEquals(m.feeds(), [w], 'read matches write')
+          cb()
+        })
+      })
+    })
+  }
 })
