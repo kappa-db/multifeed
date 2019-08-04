@@ -234,3 +234,16 @@ test('close after double-open', function (t) {
     })
   }
 })
+
+test.only('can provide custom encryption key', function (t) {
+  t.plan(2)
+
+  var core = hypercore(ram)
+  core.ready(function () {
+    var multi = multifeed(hypercore, ram, { valueEncoding: 'json', encryptionKey: core.key })
+    multi.ready(function () {
+      t.same(multi._opts.encryptionKey, core.key, 'encryption key set')
+      t.same(multi._fake.key, core.key, 'fake key set')
+    })
+  })
+})

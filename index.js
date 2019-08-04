@@ -8,6 +8,8 @@ var through = require('through2')
 var debug = require('debug')('multifeed')
 var multiplexer = require('./mux')
 
+var defaultEncryptionKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
+
 module.exports = Multifeed
 
 function Multifeed (hypercore, storage, opts) {
@@ -16,6 +18,9 @@ function Multifeed (hypercore, storage, opts) {
   this._feeds = {}
   this._feedKeyToFeed = {}
   this._streams = []
+
+  // Support legacy opts.key
+  if (opts.key) opts.encryptionKey = opts.key
 
   this._hypercore = hypercore
   this._opts = opts
@@ -34,16 +39,19 @@ function Multifeed (hypercore, storage, opts) {
     }
   }
 
-
   var self = this
   this._ready = readyify(function (done) {
     // Private key-less constant hypercore to bootstrap hypercore-protocol
     // replication.
-    var protocolEncryptionKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
-    if (self._opts.key) protocolEncryptionKey = Buffer.from(self._opts.key)
-    else debug(self._id + ' Warning, running multifeed with unsecure default key')
+    var encryptionKey = defaultEncryptionKey
+    if (self._opts.encryptionKey) {
+      if (typeof self._opts.encryptionKey === 'string') encryptionKey = Buffer.from(self._opts.encryptionKey)
+      else encryptionKey = self._opts.encryptionKey
+    } else {
+      debug(self._id + ' Warning, running multifeed with unsecure default key')
+    }
 
-    var feed = hypercore(self._storage('_fake'), protocolEncryptionKey)
+    var feed = hypercore(self._storage('_fake'), encryptionKey)
 
     feed.ready(function () {
       self._fake = feed
