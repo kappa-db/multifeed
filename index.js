@@ -45,7 +45,7 @@ function Multifeed (hypercore, storage, opts) {
     // replication.
     var encryptionKey = defaultEncryptionKey
     if (self._opts.encryptionKey) {
-      if (typeof self._opts.encryptionKey === 'string') encryptionKey = Buffer.from(self._opts.encryptionKey)
+      if (typeof self._opts.encryptionKey === 'string') encryptionKey = Buffer.from(self._opts.encryptionKey, 'hex')
       else encryptionKey = self._opts.encryptionKey
     } else {
       debug(self._id + ' Warning, running multifeed with unsecure default key')
