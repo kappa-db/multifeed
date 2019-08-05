@@ -20,7 +20,8 @@
     "inherits": "^2.0.3",
     "mutexify": "^1.2.0",
     "random-access-file": "^2.0.1",
-    "through2": "^3.0.0"
+    "through2": "^3.0.0",
+    "replic8": "../replic8"
   },
   "devDependencies": {
     "hypercore": "^6.18.1",

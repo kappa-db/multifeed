@@ -6,7 +6,7 @@ var readyify = require('./ready')
 var mutexify = require('mutexify')
 var through = require('through2')
 var debug = require('debug')('multifeed')
-var multiplexer = require('./mux')
+var replic8 = require('replic8')
 
 // Key-less constant hypercore to bootstrap hypercore-protocol replication.
 var defaultEncryptionKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
@@ -19,7 +19,7 @@ function Multifeed (hypercore, storage, opts) {
   this._feeds = {}
   this._feedKeyToFeed = {}
   this._streams = []
-
+  this._replicationManager = null
   // Support legacy opts.key
   if (opts.key) opts.encryptionKey = opts.key
 
@@ -81,7 +81,6 @@ Multifeed.prototype._addFeed = function (feed, name) {
   this._feedKeyToFeed[feed.key.toString('hex')] = feed
   feed.setMaxListeners(Infinity)
   this.emit('feed', feed, name)
-  this._forwardLiveFeedAnnouncements(feed, name)
 }
 
 Multifeed.prototype.ready = function (cb) {
@@ -216,6 +215,76 @@ Multifeed.prototype.feed = function (key) {
   else return null
 }
 
+/**
+ * Multifeed implements middleware interface
+ */
+
+// Share all feeds
+Multifeed.prototype.share = function (next) {
+  var self = this
+  this.ready(function () {
+    var feeds = self.feeds()
+    next(null, feeds)
+  })
+}
+
+// Tag all our own feeds with 'origin' header
+Multifeed.prototype.describe = function (ctx, next) {
+  var self = this
+  this.ready(function () {
+    if (self.feed(ctx.key)) next(null, { origin: 'multifeed' })
+    else next() // don't care about unknown keys.
+  })
+}
+
+// Accept all feeds with correct 'origin' header
+// initializes new feeds if missing
+Multifeed.prototype.accept = function (ctx, next) {
+  var self = this
+  var key = ctx.key
+  var meta = ctx.meta
+  // Ignore non-multifeed feeds
+  if (meta.origin !== 'multifeed') return next()
+
+  this.ready(function () {
+    var feed = self.feed(key)
+    // accept the feed if it already exist
+    if (feed) return next(null, true)
+
+    // If not, then create the feed and mark it as accepted afterwards.
+    self.writerLock(function (release) {
+      var keyId = Object.keys(self._feeds).length
+      var myKey = String(keyId)
+      var storage = self._storage(keyId)
+      try {
+        debug(self._id + ' [REPLICATION] trying to create new local hypercore, key=' + key.toString('hex'))
+        var feed = self._hypercore(storage, Buffer.from(key, 'hex'), self._opts)
+        feed.ready(function () {
+          self._addFeed(feed, myKey)
+          debug(self._id + ' [REPLICATION] succeeded in creating new local hypercore, key=' + key.toString('hex'))
+          release(next, null, true)
+        })
+      } catch (e) {
+        debug(self._id + ' [REPLICATION] failed to create new local hypercore, key=' + key.toString('hex'))
+        debug(self._id + e.toString())
+        release(next, e) // something went wrong, manager will disconnect the peer.
+      }
+    })
+  })
+}
+
+// Provde key to feed lookup for replication and other middleware
+Multifeed.prototype.resolve = function (key, next) {
+  var self = this
+  this.ready(function () {
+    next(null, self.feed(key))
+  })
+}
+
+/*
+ * End of middleware interface
+ */
+
 Multifeed.prototype.replicate = function (opts) {
   if (!this._root) {
     var tmp = through()
@@ -225,126 +294,20 @@ Multifeed.prototype.replicate = function (opts) {
     return tmp
   }
 
-  if (!opts) opts = {}
-  var self = this
-  var mux = multiplexer(self._root.key, opts)
+  // Lazy manager initialization / Legacy support
+  if (!this._replicationManager) {
+    this._replicationManager = replic8(this._root.key, opts)
+    this._replicationManager.on('error', function (err) {
+      // console.error(err)
+      // this.emit('error', err) // 1 regression test fail when this line is uncommented
+    }.bind(this))
 
-  // Add key exchange listener
-  var onManifest = function (m) {
-    mux.requestFeeds(m.keys)
-  }
-  mux.on('manifest', onManifest)
-
-  // Add replication listener
-  var onReplicate = function (keys, repl) {
-    addMissingKeys(keys, function (err) {
-      if (err) return mux.destroy(err)
-
-      // Create a look up table with feed-keys as keys
-      // (since not all keys in self._feeds are actual feed-keys)
-      var key2feed = values(self._feeds).reduce(function (h, feed) {
-        h[feed.key.toString('hex')] = feed
-        return h
-      }, {})
-
-      // Select feeds by key from LUT
-      var feeds = keys.map(function (k) { return key2feed[k] })
-      repl(feeds)
-    })
-  }
-  mux.on('replicate', onReplicate)
-
-  // Start streaming
-  this.ready(function(err){
-    if (err) return mux.stream.destroy(err)
-    if (mux.stream.destroyed) return
-    mux.ready(function(){
-      var keys = values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
-      mux.offerFeeds(keys)
-    })
-
-    // Push session to _streams array
-    self._streams.push(mux)
-
-    // Register removal
-    var cleanup = function (err) {
-      mux.removeListener('manifest', onManifest)
-      mux.removeListener('replicate', onReplicate)
-      self._streams.splice(self._streams.indexOf(mux), 1)
-      debug('[REPLICATION] Client connection destroyed', err)
-    }
-    mux.stream.once('end', cleanup)
-    mux.stream.once('error', cleanup)
-  })
-
-  return mux.stream
-
-  // Helper functions
-
-  function addMissingKeys (keys, cb) {
-    self.ready(function (err) {
-      if (err) return cb(err)
-      self.writerLock(function (release) {
-        addMissingKeysLocked(keys, function (err) {
-          release(cb, err)
-        })
-      })
-    })
+    this._replicationManager.use(this) // register self.
   }
 
-  function addMissingKeysLocked (keys, cb) {
-    var pending = 0
-    debug(self._id + ' [REPLICATION] recv\'d ' + keys.length + ' keys')
-    var filtered = keys.filter(function (key) {
-      return !Number.isNaN(parseInt(key, 16)) && key.length === 64
-    })
-
-    var numFeeds = Object.keys(self._feeds).length
-    var keyId = numFeeds
-    filtered.forEach(function (key) {
-      var feeds = values(self._feeds).filter(function (feed) {
-        return feed.key.toString('hex') === key
-      })
-      if (!feeds.length) {
-        var myKey = String(keyId)
-        var storage = self._storage(keyId)
-        keyId++
-        pending++
-        var feed
-        try {
-          debug(self._id + ' [REPLICATION] trying to create new local hypercore, key=' + key.toString('hex'))
-          feed = self._hypercore(storage, Buffer.from(key, 'hex'), self._opts)
-        } catch (e) {
-          debug(self._id + ' [REPLICATION] failed to create new local hypercore, key=' + key.toString('hex'))
-          debug(self._id + e.toString())
-          if (!--pending) cb()
-          return
-        }
-        feed.ready(function () {
-          self._addFeed(feed, myKey)
-          keyId++
-          debug(self._id + ' [REPLICATION] succeeded in creating new local hypercore, key=' + key.toString('hex'))
-          if (!--pending) cb()
-        })
-      }
-    })
-    if (!pending) cb()
-  }
-}
-
-Multifeed.prototype._forwardLiveFeedAnnouncements = function (feed, name) {
-  if (!this._streams.length) return // no-op if no live-connections
-  var self = this
-  var hexKey = feed.key.toString('hex');
-  // Tell each remote that we have a new key available unless
-  // it's already being replicated
-  this._streams.forEach(function(mux) {
-    if (mux.knownFeeds().indexOf(hexKey) === -1) {
-      self._streams
-      debug("Forwarding new feed to existing peer:", hexKey)
-      mux.offerFeeds([hexKey])
-    }
-  })
+  // Let replication manager take care of replication
+  // requests
+  return this._replicationManager.replicate(opts)
 }
 
 // TODO: what if the new data is shorter than the old data? things will break!
