@@ -307,7 +307,7 @@ Multifeed.prototype.replicate = function (opts) {
       })
       if (!feeds.length) {
         var myKey = String(keyId)
-        var storage = self._storage(keyId)
+        var storage = self._storage(myKey)
         keyId++
         pending++
         var feed
