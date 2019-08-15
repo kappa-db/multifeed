@@ -125,20 +125,6 @@ With [npm](https://npmjs.org/) installed, run
 $ npm install multifeed
 ```
 
-## Hacks
-
-1. `hypercore-protocol` requires the first feed exchanged to be common between
-   replicating peers. This prevents two strangers from exchanging sets of
-   hypercores. A "fake" hypercore with a hardcoded public key is included in the
-   code to bootstrap the replication process. I discarded the private key, but
-   even if I didn't, it doesn't let me do anything nefarious. You could patch
-   this with your own key of choice.
-2. `hypercore-protocol` requires all feed keys be known upfront: only discovery
-   keys are exchanged (`discoveryKey = hash(key)`), so this module wraps the
-   hypercore replication duplex stream in a secondary duplex stream that
-   exchanges feed public keys upfront before moving on to the hypercore
-   replication mechanism.
-
 ## See Also
 
 - [multifeed-index](https://github.com/noffle/multifeed-index)
