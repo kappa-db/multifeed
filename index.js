@@ -20,6 +20,7 @@ function Multifeed (hypercore, storage, opts) {
   this._feedKeyToFeed = {}
   this._streams = []
   this._replicationManager = null
+  this.headerOrigin = opts.headerOrigin || 'multifeed'
   // Support legacy opts.key
   if (opts.key) opts.encryptionKey = opts.key
 
@@ -232,7 +233,7 @@ Multifeed.prototype.share = function (next) {
 Multifeed.prototype.describe = function (ctx, next) {
   var self = this
   this.ready(function () {
-    if (self.feed(ctx.key)) next(null, { origin: 'multifeed' })
+    if (self.feed(ctx.key)) next(null, { origin: self.headerOrigin })
     else next() // don't care about unknown keys.
   })
 }
@@ -244,7 +245,7 @@ Multifeed.prototype.accept = function (ctx, next) {
   var key = ctx.key
   var meta = ctx.meta
   // Ignore non-multifeed feeds
-  if (meta.origin !== 'multifeed') return next()
+  if (meta.origin !== self.headerOrigin) return next()
 
   this.ready(function () {
     var feed = self.feed(key)
@@ -281,6 +282,14 @@ Multifeed.prototype.resolve = function (key, next) {
   })
 }
 
+// Multifeed used to include replication manager capabilities.
+// Now it might be included in an external replication stack
+// and by storing a reference to the external manager on inclusion
+// we can continue to support `replicate()` calls on
+// an multifeed instance for the sake of backwards compatibility
+Multifeed.prototype._on_use = function (mgr, namespace) {
+  this._replicationManager = mgr
+}
 /*
  * End of middleware interface
  */
