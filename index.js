@@ -263,7 +263,7 @@ Multifeed.prototype.accept = function (ctx, next) {
         feed.ready(function () {
           self._addFeed(feed, myKey)
           debug(self._id + ' [REPLICATION] succeeded in creating new local hypercore, key=' + key.toString('hex'))
-          release(next, null, true)
+          release(next, null, feed)
         })
       } catch (e) {
         debug(self._id + ' [REPLICATION] failed to create new local hypercore, key=' + key.toString('hex'))
@@ -288,6 +288,9 @@ Multifeed.prototype.resolve = function (key, next) {
 // we can continue to support `replicate()` calls on
 // an multifeed instance for the sake of backwards compatibility
 Multifeed.prototype._on_use = function (mgr, namespace) {
+  if (this._replicationManager && this._replicationManager !== mgr) {
+    console.warn('WARNING! Calling multifeed.replicate() is unsafe when used in more than one manager. use mgr.replicate() instead!')
+  }
   this._replicationManager = mgr
 }
 /*
@@ -305,13 +308,30 @@ Multifeed.prototype.replicate = function (opts) {
 
   // Lazy manager initialization / Legacy support
   if (!this._replicationManager) {
-    this._replicationManager = replic8(this._root.key, opts)
-    this._replicationManager.on('error', function (err) {
-      // console.error(err)
-      // this.emit('error', err) // 1 regression test fail when this line is uncommented
-    }.bind(this))
+    const mgr = replic8(this._root.key, opts)
+    // Automatic error logger for backwards compatibility.
+    const errLogger = function (err) {
+      // Ignore errors if the manager has other error handlers registered.
+      if (mgr.listeners('error').find(function (l) { return l !== errLogger })) {
+        return
+      }
 
-    this._replicationManager.use(this) // register self.
+      // If manager dosent have another handler, and neither does this multifeed
+      // instance, then log a warning on the console for now.
+      // Applications should handle their own errors even if they simply log them.
+      if (!this.listeners('error').length) {
+        console.warn('WARNING! multifeed will not log errors in the future,' +
+          'please add an "error" event listener to either multifeed or your replication manager')
+        console.error(err)
+      } else {
+        // There's an errorhandler registered on this instance.
+        // forward the error event
+        this.emit('error', err)
+      }
+    }.bind(this)
+
+    mgr.on('error', errLogger)
+    mgr.use(this) // register self.
   }
 
   // Let replication manager take care of replication
