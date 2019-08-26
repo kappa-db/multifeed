@@ -20,6 +20,8 @@ function Multifeed (hypercore, storage, opts) {
   this._feedKeyToFeed = {}
   this._streams = []
 
+  opts = opts || {}
+
   // Support legacy opts.key
   if (opts.key) opts.encryptionKey = opts.key
 
