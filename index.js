@@ -74,6 +74,8 @@ function Multifeed (hypercore, storage, opts) {
       })
     })
   })
+
+  this.setMaxListeners(Infinity)
 }
 
 inherits(Multifeed, events.EventEmitter)
