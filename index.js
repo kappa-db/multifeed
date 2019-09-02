@@ -227,6 +227,8 @@ Multifeed.prototype.feed = function (key) {
 
 // Share all feeds
 Multifeed.prototype.share = function (next) {
+  if (this.closed) return next()
+
   var self = this
   this.ready(function () {
     var feeds = self.feeds()
@@ -236,6 +238,8 @@ Multifeed.prototype.share = function (next) {
 
 // Tag all our own feeds with 'origin' header
 Multifeed.prototype.describe = function (ctx, next) {
+  if (this.closed) return next()
+
   var self = this
   this.ready(function () {
     if (self.feed(ctx.key)) next(null, { origin: self.headerOrigin })
@@ -246,6 +250,8 @@ Multifeed.prototype.describe = function (ctx, next) {
 // Accept all feeds with correct 'origin' header
 // initializes new feeds if missing
 Multifeed.prototype.accept = function (ctx, next) {
+  if (this.closed) return next()
+
   var self = this
   var key = ctx.key
   var meta = ctx.meta
@@ -279,8 +285,10 @@ Multifeed.prototype.accept = function (ctx, next) {
   })
 }
 
-// Provde key to feed lookup for replication and other middleware
+// Provide key to feed lookup for replication and other middleware
 Multifeed.prototype.resolve = function (key, next) {
+  if (this.closed) return next()
+
   var self = this
   this.ready(function () {
     next(null, self.feed(key))
