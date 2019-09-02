@@ -20,7 +20,10 @@ function Multifeed (hypercore, storage, opts) {
   this._feedKeyToFeed = {}
   this._streams = []
   this._replicationManager = null
+
+  opts = opts || {}
   this.headerOrigin = opts.headerOrigin || 'multifeed'
+
   // Support legacy opts.key
   if (opts.key) opts.encryptionKey = opts.key
 
@@ -73,6 +76,8 @@ function Multifeed (hypercore, storage, opts) {
       })
     })
   })
+
+  this.setMaxListeners(Infinity)
 }
 
 inherits(Multifeed, events.EventEmitter)
@@ -256,7 +261,7 @@ Multifeed.prototype.accept = function (ctx, next) {
     self.writerLock(function (release) {
       var keyId = Object.keys(self._feeds).length
       var myKey = String(keyId)
-      var storage = self._storage(keyId)
+      var storage = self._storage(myKey)
       try {
         debug(self._id + ' [REPLICATION] trying to create new local hypercore, key=' + key.toString('hex'))
         var feed = self._hypercore(storage, Buffer.from(key, 'hex'), self._opts)
