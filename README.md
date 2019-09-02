@@ -67,6 +67,12 @@ and are the same as
 Valid `opts` include:
 - `opts.key` (string): optional encryption key to use during replication.
 
+- `opts.headerOrigin` (string): when using multiple multifeeds or stores in
+  a single replication stack, this option controls the 'origin' tag which
+  is used as an address label to ensure that feeds end up in expected
+  stores during replication. defaults to: `'multifeed'`
+
+
 ### multi.writer([name, ]cb)
 
 If no `name` is given, a new local writeable feed is created and returned via
@@ -101,11 +107,38 @@ Create a duplex stream for replication.
 Works just like hypercore, except *all* local hypercores are exchanged between
 replication endpoints.
 
-**Note**: this stream is *not* an encrypted channel.
+~~**Note**: this stream is *not* an encrypted channel.~~ it is now.
 
 ### multi.on('feed', function (feed, name) { ... })
 
 Emitted whenever a new feed is added, whether locally or remotely.
+
+### multi.use([namespace,] function middleware() { ... })
+
+Helper for backwards compatibility.
+Forwards the `use` call to the current ReplicationManager.
+If the multifeed instance has no replication manager, then one will be lazily
+initialized.
+
+**Note:** When assembling complex replication stacks it is recommended to do the
+reverse and include multifeed into an existing stack instead of using the
+internal lazily initialized one:
+```js
+// Manually initialize your replication stack
+var app = replic8(encryptionKey)
+
+// Initialize stores & middleware
+var multi1 = multifeed(storage1, { headerOrigin: 'texts' })
+var multi2 = multifeed(storage2, { headerOrigin: 'images' })
+
+// Register multifeeds as a middleware in the stack
+app.use(multi1)
+app.use(multi2)
+
+// Replicate entire stack
+var stream = app.replicate({ live: true })
+```
+
 
 ## multi.close(cb)
 
