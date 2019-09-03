@@ -95,6 +95,7 @@ Multifeed.prototype.ready = function (cb) {
 
 Multifeed.prototype.close = function (cb) {
   var self = this
+  if (typeof cb !== 'function') cb = function noop () {}
 
   this.writerLock(function (release) {
     function done (err) {
