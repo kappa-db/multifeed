@@ -38,8 +38,7 @@ function Multiplexer (key, opts) {
   var stream = this.stream = protocol(Object.assign({},opts,{
     userData: Buffer.from(JSON.stringify({
       client: MULTIFEED,
-      version: PROTOCOL_VERSION,
-      timeout: 15000
+      version: PROTOCOL_VERSION
     })),
     // Extend hypercore-protocol for the main stream with multifeed events
     extensions: SupportedExtensions
