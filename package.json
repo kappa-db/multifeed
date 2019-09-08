@@ -20,7 +20,7 @@
     "inherits": "^2.0.3",
     "mutexify": "^1.2.0",
     "random-access-file": "^2.0.1",
-    "replic8": "^0.6.4",
+    "replic8": "^0.7.0",
     "through2": "^3.0.0"
   },
   "devDependencies": {
