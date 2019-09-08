@@ -100,7 +100,6 @@ Multifeed.prototype.close = function (cb) {
 
 function _close (cb) {
   var self = this
-  console.log('CLOSE CALLDED')
   this.writerLock(function (release) {
     function done (err) {
       release(function () {
