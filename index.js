@@ -30,6 +30,7 @@ function Multifeed (hypercore, storage, opts) {
 
   this.writerLock = mutexify()
 
+  this._close = readyify(_close.bind(this), true)
   this.closed = false
 
   // random-access-storage wrapper that wraps all hypercores in a directory
@@ -93,9 +94,13 @@ Multifeed.prototype.ready = function (cb) {
 }
 
 Multifeed.prototype.close = function (cb) {
-  var self = this
   if (typeof cb !== 'function') cb = function noop () {}
+  return this._close(cb)
+}
 
+function _close (cb) {
+  var self = this
+  console.log('CLOSE CALLDED')
   this.writerLock(function (release) {
     function done (err) {
       release(function () {
