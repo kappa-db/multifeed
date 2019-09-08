@@ -280,3 +280,27 @@ test('regression: MFs with different root keys cannot replicate', function (t) {
     })
   }
 })
+
+test('Calling close while closing should not throw errors', function (t) {
+  var multi = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  multi.ready(function () {
+    multi.writer('default', function (err, wr) {
+      t.error(err)
+      wr.append(Buffer.from('some data'), function (err) {
+        t.error(err)
+        var p = 2
+        multi.close(function () {
+          t.ok('initial close finished')
+          t.equal(multi.closed, true)
+          if (!--p) t.end()
+        })
+        t.equal(multi.closed, false, 'Multi not *yet* closed')
+        multi.close(function () {
+          t.ok('second close finished')
+          t.equal(multi.closed, true)
+          if (!--p) t.end()
+        })
+      })
+    })
+  })
+})
