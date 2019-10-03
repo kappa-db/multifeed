@@ -38,7 +38,8 @@ function Multiplexer (key, opts) {
   var stream = this.stream = protocol(Object.assign({},opts,{
     userData: Buffer.from(JSON.stringify({
       client: MULTIFEED,
-      version: PROTOCOL_VERSION
+      version: PROTOCOL_VERSION,
+      id: this._id
     })),
     // Extend hypercore-protocol for the main stream with multifeed events
     extensions: SupportedExtensions
@@ -50,7 +51,7 @@ function Multiplexer (key, opts) {
   stream.on('handshake', function () {
     var header = null
     try {
-      header = JSON.parse(this.userData.toString('utf8'))
+      header = JSON.parse(this.remoteUserData.toString('utf8'))
     } catch (err) {
       debug(self._id + ' [REPLICATION] Failed parsing JSON handshake', err)
       self._finalize(err)
