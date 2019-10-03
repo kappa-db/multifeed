@@ -16,15 +16,14 @@
   "keywords": [],
   "dependencies": {
     "debug": "^4.1.0",
-    "hypercore-protocol": "^6.8.0",
+    "decentstack": "^0.7.5",
     "inherits": "^2.0.3",
     "mutexify": "^1.2.0",
     "random-access-file": "^2.0.1",
-    "replic8": "^0.7.0",
     "through2": "^3.0.0"
   },
   "devDependencies": {
-    "hypercore": "^6.18.1",
+    "hypercore": "^8.1.2",
     "pump": "^3.0.0",
     "pumpify": "^1.5.1",
     "random-access-memory": "^2.4.0",

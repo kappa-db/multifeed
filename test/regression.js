@@ -73,9 +73,9 @@ test('regression: MF with no writer replicate to MF with 1 writer', function (t)
 
   setup1(m1, 'foo', function () {
     setup2(m2, 'bar', function () {
-      var r = m1.replicate()
+      var r = m1.replicate(true)
       r.once('end', done)
-      var s = m2.replicate()
+      var s = m2.replicate(false)
       s.once('end', done)
       r.pipe(s).pipe(r)
 
@@ -139,8 +139,8 @@ test('regression: start replicating before feeds are loaded', function (t) {
 
   setup(m1, 'foo', function () {
     setup(m2, 'bar', function () {
-      var r = m1.replicate()
-      r.pipe(m2.replicate()).pipe(r)
+      var r = m1.replicate(true)
+      r.pipe(m2.replicate(false)).pipe(r)
         .once('end', check)
     })
   })
@@ -201,12 +201,12 @@ test('regression: announce new feed on existing connections', function(t) {
         })
 
         // m1 and m2 are now live connected.
-        r1 = m1.replicate({live: true})
-        r1.pipe(m2.replicate({live: true})).pipe(r1)
+        r1 = m1.replicate(true, {live: true})
+        r1.pipe(m2.replicate(false, {live: true})).pipe(r1)
 
         // When m3 is attached to m2, m2 should forward m3's writer to m1.
-        r2 = m3.replicate({live:true})
-        r2.pipe(m2.replicate({live:true})).pipe(r2)
+        r2 = m3.replicate(true, {live:true})
+        r2.pipe(m2.replicate(false, {live:true})).pipe(r2)
 
       })
     })
@@ -235,7 +235,7 @@ test('regression: replicate before multifeed is ready', function (t) {
   var key
 
   var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
-  var res = multi.replicate()
+  var res = multi.replicate(true)
   res.on('error', function () {
     t.ok('error hit')
   })
@@ -251,10 +251,10 @@ test('regression: MFs with different root keys cannot replicate', function (t) {
 
     setup(m1, 'foo', function () {
       setup(m2, 'bar', function () {
-        var r = m1.replicate()
-        var s = m2.replicate()
+        var r = m1.replicate(true)
+        var s = m2.replicate(false)
         pump(r, s, r, function (err) {
-          t.same(err.toString(), 'Error: First shared hypercore must be the same')
+          t.same(err.toString(), 'Error: Remote uses a different exchangeKey')
           t.end()
         })
       })

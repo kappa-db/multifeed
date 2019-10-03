@@ -6,7 +6,7 @@ var readyify = require('./ready')
 var mutexify = require('mutexify')
 var through = require('through2')
 var debug = require('debug')('multifeed')
-var replic8 = require('replic8')
+var decentstack = require('decentstack')
 
 // Key-less constant hypercore to bootstrap hypercore-protocol replication.
 var defaultEncryptionKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
@@ -254,7 +254,7 @@ Multifeed.prototype.describe = function (ctx, next) {
 
 // Accept all feeds with correct 'origin' header
 // initializes new feeds if missing
-Multifeed.prototype.accept = function (ctx, next) {
+Multifeed.prototype.store = function (ctx, next) {
   if (this.closed) return next()
 
   var self = this
@@ -266,9 +266,9 @@ Multifeed.prototype.accept = function (ctx, next) {
   this.ready(function () {
     var feed = self.feed(key)
     // accept the feed if it already exist
-    if (feed) return next(null, true)
+    if (feed) return next(null, feed)
 
-    // If not, then create the feed and mark it as accepted afterwards.
+    // If not, then create the feed.
     self.writerLock(function (release) {
       var keyId = Object.keys(self._feeds).length
       var myKey = String(keyId)
@@ -303,11 +303,11 @@ Multifeed.prototype.resolve = function (key, next) {
 // Multifeed used to include replication manager capabilities.
 // Now it might be included in an external replication stack
 // and by storing a reference to the external manager on inclusion
-// we can continue to support `replicate()` calls on
-// an multifeed instance for the sake of backwards compatibility
+// we will continue to support `replicate(boolean, opts)` calls to follow the
+// standard interface
 Multifeed.prototype.mounted = function (mgr, namespace) {
   if (this._replicationManager && this._replicationManager !== mgr) {
-    console.warn('WARNING! Calling multifeed.replicate() is unsafe when used in more than one manager. use mgr.replicate() instead!')
+    console.warn('WARNING! Calling multifeed.replicate() is unsafe when used in more than one stacks. use mgr.replicate() instead!')
   }
   this._replicationManager = mgr
 }
@@ -324,7 +324,7 @@ Multifeed.prototype.use = function (namespace, middleware, prepend) {
 Multifeed.prototype._lazyInitReplicationManager = function (opts) {
   if (this._replicationManager) return
 
-  var mgr = replic8(this._root.key, opts)
+  var mgr = decentstack(this._root.key, opts)
   // Automatic error logger for backwards compatibility.
   var errLogger = function (err) {
     // Ignore errors if the manager has other error handlers registered.
@@ -354,7 +354,7 @@ Multifeed.prototype._lazyInitReplicationManager = function (opts) {
   mgr.use(this)
 }
 
-Multifeed.prototype.replicate = function (opts) {
+Multifeed.prototype.replicate = function (initiator, opts) {
   if (!this._root) {
     var tmp = through()
     process.nextTick(function () {
@@ -368,7 +368,7 @@ Multifeed.prototype.replicate = function (opts) {
 
   // Let replication manager take care of replication
   // requests
-  return this._replicationManager.replicate(opts)
+  return this._replicationManager.replicate(initiator, opts)
 }
 
 // TODO: what if the new data is shorter than the old data? things will break!
