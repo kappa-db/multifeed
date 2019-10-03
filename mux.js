@@ -26,7 +26,7 @@ function Multiplexer (key, opts) {
   if (!(this instanceof Multiplexer)) return new Multiplexer(key, opts)
   var self = this
   self._opts = opts = opts || {}
-  this._id = opts._id || Math.floor(Math.random() * 1000).toString(16)
+  this._id = opts._id || Math.floor(Math.random() * 10000).toString(16)
   debug(this._id + ' [REPLICATION] New mux initialized', key.toString('hex'), opts)
 
   // initialize
@@ -39,7 +39,7 @@ function Multiplexer (key, opts) {
     userData: Buffer.from(JSON.stringify({
       client: MULTIFEED,
       version: PROTOCOL_VERSION,
-      id: this._id
+      userData: opts.userData
     })),
     // Extend hypercore-protocol for the main stream with multifeed events
     extensions: SupportedExtensions
