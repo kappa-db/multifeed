@@ -306,7 +306,7 @@ test('regression: calling close while closing should not throw errors', function
   })
 })
 
-test.only('regression: sync two single-core multifeeds /w different storage speeds', function (t) {
+test('regression: sync two single-core multifeeds /w different storage speeds', function (t) {
   t.plan(5)
 
   function slowram (delay) {
