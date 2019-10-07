@@ -2,6 +2,7 @@ var test = require('tape')
 var hypercore = require('hypercore')
 var multifeed = require('..')
 var ram = require('random-access-memory')
+var ral = require('random-access-latency')
 var tmp = require('tmp').tmpNameSync
 var rimraf = require('rimraf')
 
@@ -246,4 +247,66 @@ test('can provide custom encryption key', function (t) {
       t.same(multi._root.key, core.key, 'fake key set')
     })
   })
+})
+
+test('replicate slow-to-open multifeeds', function (t) {
+  t.plan(22)
+
+  function slow (delay) {
+    return function (name) {
+      return ral([delay,delay], ram())
+    }
+  }
+
+  var m1 = multifeed(hypercore, slow(100), { valueEncoding: 'json' })
+  var m2 = multifeed(hypercore, slow(100), { valueEncoding: 'json' })
+
+  var feedEvents1 = 0
+  var feedEvents2 = 0
+  m1.on('feed', function (feed, name) {
+    t.equals(name, String(feedEvents1))
+    feedEvents1++
+  })
+  m2.on('feed', function (feed, name) {
+    t.equals(name, String(feedEvents2))
+    feedEvents2++
+  })
+
+  function setup (m, buf, cb) {
+    m.writer(function (err, w) {
+      t.error(err)
+      w.append(buf, function (err) {
+        t.error(err)
+        w.get(0, function (err, data) {
+          t.error(err)
+          t.equals(data, buf)
+          t.deepEquals(m.feeds(), [w])
+          cb()
+        })
+      })
+    })
+  }
+
+  setup(m1, 'foo', function () {
+    setup(m2, 'bar', function () {
+      var r = m1.replicate()
+      r.pipe(m2.replicate()).pipe(r)
+        .once('end', check)
+    })
+  })
+
+  function check () {
+    t.equals(m1.feeds().length, 2)
+    t.equals(m2.feeds().length, 2)
+    m1.feeds()[1].get(0, function (err, data) {
+      t.error(err)
+      t.equals(data, 'bar')
+    })
+    m2.feeds()[1].get(0, function (err, data) {
+      t.error(err)
+      t.equals(data, 'foo')
+    })
+    t.equals(feedEvents1, 2)
+    t.equals(feedEvents2, 2)
+  }
 })

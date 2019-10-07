@@ -281,7 +281,7 @@ test('regression: MFs with different root keys cannot replicate', function (t) {
   }
 })
 
-test('Calling close while closing should not throw errors', function (t) {
+test('regression: calling close while closing should not throw errors', function (t) {
   var multi = multifeed(hypercore, ram, { valueEncoding: 'json' })
   multi.ready(function () {
     multi.writer('default', function (err, wr) {
