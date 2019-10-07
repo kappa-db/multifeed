@@ -192,11 +192,20 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
   keys = uniq(keys)
   debug(this._id, '[REPLICATION] _replicateFeeds', keys.length, keys)
 
+  // Increment expected feeds to keep the stream alive until all pending cores
+  // are added. Otherwise a non-live replication might terminate because it
+  // thinks all feeds have been synced, even though new ones are still in the
+  // process of being set up for sync.
+  this.stream.expectedFeeds++
+
   this.emit('replicate', keys, startFeedReplication)
 
   return keys
 
   function startFeedReplication(feeds){
+    // Decrement back down the expected feeds.
+    self.stream.expectedFeeds--
+
     if (!Array.isArray(feeds)) feeds = [feeds]
     self.stream.expectedFeeds += feeds.length
 

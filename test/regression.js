@@ -2,6 +2,7 @@ var test = require('tape')
 var hypercore = require('hypercore')
 var multifeed = require('..')
 var ram = require('random-access-memory')
+var ral = require('random-access-latency')
 var tmp = require('tmp').tmpNameSync
 var pump = require('pump')
 
@@ -303,4 +304,40 @@ test('regression: calling close while closing should not throw errors', function
       })
     })
   })
+})
+
+test.only('regression: sync two single-core multifeeds /w different storage speeds', function (t) {
+  t.plan(5)
+
+  function slowram (delay) {
+    return function (name) {
+      return ral([delay,delay], ram())
+    }
+  }
+
+  var m1 = multifeed(hypercore, slowram(1), { valueEncoding: 'json' })
+  var m2 = multifeed(hypercore, slowram(500), { valueEncoding: 'json' })
+
+  function setup (m, cb) {
+    m.writer(function (err, w) {
+      t.error(err)
+      cb()
+    })
+  }
+
+  setup(m1, function () {
+    setup(m2, function () {
+      var r = m1.replicate()
+      var s = m2.replicate()
+      pump(r, s, r, function (err) {
+        t.error(err)
+        check()
+      })
+    })
+  })
+
+  function check () {
+    t.equals(m1.feeds().length, 2, '2 feeds')
+    t.equals(m2.feeds().length, 2, '2 feeds')
+  }
 })
