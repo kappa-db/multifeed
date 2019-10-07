@@ -78,7 +78,7 @@ function Multiplexer (key, opts) {
 
   feed.on('extension', function (type, message) {
     try {
-      debug(self._id + 'Extension:', type, message.toString('utf8'))
+      debug(self._id, 'Extension:', type, message.toString('utf8'))
       var data = JSON.parse(message.toString('utf8'))
       switch(type) {
         case MANIFEST:
@@ -168,7 +168,7 @@ Multiplexer.prototype._requestHandler = function (keys) {
   })
   filtered = uniq(filtered)
   // Tell remote which keys we will replicate
-  debug('[REPLICATION] Sending REPLICATE_FEEDS')
+  debug(this._id, '[REPLICATION] Sending REPLICATE_FEEDS')
   this._feed.extension(REPLICATE_FEEDS, Buffer.from(JSON.stringify(filtered)))
 
   // Start replicating as promised.
@@ -190,7 +190,7 @@ Multiplexer.prototype._onRemoteReplicate = function (keys) {
 Multiplexer.prototype._replicateFeeds = function(keys) {
   var self = this
   keys = uniq(keys)
-  debug(this._id + '[REPLICATION] _replicateFeeds', keys.length, keys)
+  debug(this._id, '[REPLICATION] _replicateFeeds', keys.length, keys)
 
   this.emit('replicate', keys, startFeedReplication)
 
@@ -208,13 +208,13 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
 
         // prevent a feed from being folded into the main stream twice.
         if (typeof self._activeFeedStreams[hexKey] !== 'undefined') {
-          debug(self._id + '[REPLICATION] warning! Prevented duplicate replication of: ', hexKey)
+          debug(self._id, '[REPLICATION] warning! Prevented duplicate replication of: ', hexKey)
           // decrease the expectedFeeds that was unconditionally increased
           self.stream.expectedFeeds--
           return
         }
 
-        debug(self._id + '[REPLICATION] replicating feed:', hexKey)
+        debug(self._id, '[REPLICATION] replicating feed:', hexKey)
         var fStream = feed.replicate(Object.assign({}, {
           live: self._opts.live,
           download: self._opts.download,
@@ -230,7 +230,7 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
           if (!self._activeFeedStreams[hexKey]) return
           // delete feed stream reference
           delete self._activeFeedStreams[hexKey]
-          debug(self._id + "[REPLICATION] feedStream closed:", hexKey.substr(0,8))
+          debug(self._id, "[REPLICATION] feedStream closed:", hexKey.substr(0,8))
         }
         fStream.once('end', cleanup)
         fStream.once('error', cleanup)

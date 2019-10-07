@@ -237,7 +237,7 @@ Multifeed.prototype.replicate = function (opts) {
 
   if (!opts) opts = {}
   var self = this
-  var mux = multiplexer(self._root.key, opts)
+  var mux = multiplexer(self._root.key, Object.assign({}, opts, {_id:this._id}))
 
   // Add key exchange listener
   var onManifest = function (m) {
