@@ -4,3 +4,5 @@ stress.js
 db
 todo.json
 test/
+.travis.yml
+example.js
