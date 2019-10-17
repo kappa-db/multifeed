@@ -248,7 +248,7 @@ Multifeed.prototype.replicate = function (opts) {
   // Add replication listener
   var onReplicate = function (keys, repl) {
     addMissingKeys(keys, function (err) {
-      if (err) return mux.destroy(err)
+      if (err) return mux.stream.destroy(err)
 
       // Create a look up table with feed-keys as keys
       // (since not all keys in self._feeds are actual feed-keys)
