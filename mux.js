@@ -1,4 +1,4 @@
-var protocol = require('hypercore-protocol')
+var Protocol = require('hypercore-protocol')
 var readify = require('./ready')
 var inherits = require('inherits')
 var events = require('events')
@@ -26,11 +26,12 @@ var SupportedExtensions = [
 ]
 // `key` - protocol encryption key
 // `opts`- hypercore-protocol opts
-function Multiplexer (key, opts) {
-  if (!(this instanceof Multiplexer)) return new Multiplexer(key, opts)
+function Multiplexer (isInitiator, key, opts) {
+  if (!(this instanceof Multiplexer)) return new Multiplexer(isInitiator, key, opts)
   var self = this
   self._opts = opts = opts || {}
   this._id = opts._id || Math.floor(Math.random() * 10000).toString(16)
+  this._initiator = isInitiator
   debug(this._id + ' [REPLICATION] New mux initialized', key.toString('hex'), opts)
 
   // initialize
@@ -39,7 +40,7 @@ function Multiplexer (key, opts) {
   self._remoteOffer = []
   self._activeFeedStreams = {}
 
-  var stream = this.stream = protocol(Object.assign({},opts,{
+  var stream = this.stream = new Protocol(isInitiator, Object.assign({}, opts, {
     userData: Buffer.from(JSON.stringify({
       client: MULTIFEED,
       version: PROTOCOL_VERSION,
@@ -235,7 +236,7 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
         }
 
         debug(self._id, '[REPLICATION] replicating feed:', hexKey)
-        var fStream = feed.replicate(Object.assign({}, {
+        var fStream = feed.replicate(self._initiator, Object.assign({}, {
           live: self._opts.live,
           download: self._opts.download,
           upload: self._opts.upload,

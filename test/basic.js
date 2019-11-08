@@ -93,8 +93,8 @@ test('replicate two multifeeds', function (t) {
 
   setup(m1, 'foo', function () {
     setup(m2, 'bar', function () {
-      var r = m1.replicate()
-      r.pipe(m2.replicate()).pipe(r)
+      var r = m1.replicate(true)
+      r.pipe(m2.replicate(false)).pipe(r)
         .once('end', check)
     })
   })
@@ -149,8 +149,8 @@ test('live replicate two multifeeds', function (t) {
 
   setup(m1, 'foo', function () {
     setup(m2, 'bar', function () {
-      var r = m1.replicate({live:true})
-      r.pipe(m2.replicate({live:true})).pipe(r)
+      var r = m1.replicate(true, {live:true})
+      r.pipe(m2.replicate(false, {live:true})).pipe(r)
       setTimeout(check, 1000)
     })
   })
@@ -287,8 +287,8 @@ test('replicate slow-to-open multifeeds', function (t) {
 
   setup(m1, 'foo', function () {
     setup(m2, 'bar', function () {
-      var r = m1.replicate()
-      r.pipe(m2.replicate()).pipe(r)
+      var r = m1.replicate(true)
+      r.pipe(m2.replicate(false)).pipe(r)
         .once('end', check)
     })
   })

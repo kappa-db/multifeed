@@ -229,7 +229,7 @@ Multifeed.prototype.feed = function (key) {
   else return null
 }
 
-Multifeed.prototype.replicate = function (opts) {
+Multifeed.prototype.replicate = function (isInitiator, opts) {
   if (!this._root) {
     var tmp = through()
     process.nextTick(function () {
@@ -240,7 +240,7 @@ Multifeed.prototype.replicate = function (opts) {
 
   if (!opts) opts = {}
   var self = this
-  var mux = multiplexer(self._root.key, Object.assign({}, opts, {_id:this._id}))
+  var mux = multiplexer(isInitiator, self._root.key, Object.assign({}, opts, {_id:this._id}))
 
   // Add key exchange listener
   var onManifest = function (m) {

@@ -10,8 +10,8 @@ test('Key exchange API', function(t){
   t.plan(6)
   var encryptionKey = Buffer.from('deadbeefdeadbeefdeadbeefdeadbeef') // used to encrypt the connection
 
-  var mux1 = multiplexer(encryptionKey)
-  var mux2 = multiplexer(encryptionKey)
+  var mux1 = multiplexer(true, encryptionKey)
+  var mux2 = multiplexer(false, encryptionKey)
 
   mux1.ready(function(client){
     mux2.on('manifest', function(m, req) {
@@ -44,8 +44,8 @@ test('regression: ensure we\'re receiving remote handshake', function(t){
 
   var id1 = Math.random()
   var id2 = Math.random()
-  var mux1 = multiplexer(encryptionKey, { userData: id1 })
-  var mux2 = multiplexer(encryptionKey, { userData: id2 })
+  var mux1 = multiplexer(true, encryptionKey, { userData: id1 })
+  var mux2 = multiplexer(false, encryptionKey, { userData: id2 })
 
   mux1.once('ready', function (header) {
     t.equal(header.userData, id2)
