@@ -18,7 +18,6 @@ module.exports = Multifeed
 
 function Multifeed (storage, opts) {
   if (!(this instanceof Multifeed)) return new Multifeed(storage, opts)
-  hypercore = opts.hypercore || hypercore
   this._id = (opts||{})._id || Math.floor(Math.random() * 1000).toString(16)  // for debugging
   debug(this._id, 'multifeed @ ' + version)
   this._feeds = {}
@@ -30,7 +29,7 @@ function Multifeed (storage, opts) {
   // Support legacy opts.key
   if (opts.key) opts.encryptionKey = opts.key
 
-  this._hypercore = hypercore
+  this._hypercore = opts.hypercore || hypercore
   this._opts = opts
 
   this.writerLock = mutexify()
