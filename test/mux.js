@@ -38,7 +38,7 @@ test('Key exchange API', function(t){
   pump(mux1.stream,mux2.stream,mux1.stream)
 })
 
-test('REGRESSION: ensure we\'re receiving remote handshake', function(t){
+test('regression: ensure we\'re receiving remote handshake', function(t){
   t.plan(2)
   var encryptionKey = Buffer.from('deadbeefdeadbeefdeadbeefdeadbeef') // used to encrypt the connection
 

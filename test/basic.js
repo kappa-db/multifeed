@@ -1,5 +1,5 @@
 var test = require('tape')
-var hypercore = require('hypercore')
+var crypto = require('hypercore-crypto')
 var multifeed = require('..')
 var ram = require('random-access-memory')
 var ral = require('random-access-latency')
@@ -7,7 +7,7 @@ var tmp = require('tmp').tmpNameSync
 var rimraf = require('rimraf')
 
 test('no feeds', function (t) {
-  var multi = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var multi = multifeed(ram, { valueEncoding: 'json' })
 
   t.deepEquals(multi.feeds(), [])
   t.end()
@@ -16,7 +16,7 @@ test('no feeds', function (t) {
 test('create writer', function (t) {
   t.plan(5)
 
-  var multi = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var multi = multifeed(ram, { valueEncoding: 'json' })
 
   multi.writer(function (err, w) {
     t.error(err)
@@ -34,7 +34,7 @@ test('create writer', function (t) {
 test('get feed by key', function (t) {
   t.plan(3)
 
-  var multi = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var multi = multifeed(ram, { valueEncoding: 'json' })
 
   multi.writer(function (err, w) {
     t.error(err, 'valid writer created')
@@ -48,7 +48,7 @@ test('get feed by key', function (t) {
 test('get localfeed by name', function (t) {
   t.plan(3)
 
-  var multi = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var multi = multifeed(ram, { valueEncoding: 'json' })
 
   multi.writer('bob', function (err, w) {
     t.error(err, 'valid writer created')
@@ -62,8 +62,8 @@ test('get localfeed by name', function (t) {
 test('replicate two multifeeds', function (t) {
   t.plan(22)
 
-  var m1 = multifeed(hypercore, ram, { valueEncoding: 'json' })
-  var m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
 
   var feedEvents1 = 0
   var feedEvents2 = 0
@@ -118,8 +118,8 @@ test('replicate two multifeeds', function (t) {
 test('live replicate two multifeeds', function (t) {
   t.plan(22)
 
-  var m1 = multifeed(hypercore, ram, { valueEncoding: 'json' })
-  var m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
 
   var feedEvents1 = 0
   var feedEvents2 = 0
@@ -175,14 +175,14 @@ test('get localfeed by name across disk loads', function (t) {
   t.plan(5)
 
   var storage = tmp()
-  var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
+  var multi = multifeed(storage, { valueEncoding: 'json' })
 
   multi.writer('minuette', function (err, w) {
     t.error(err)
     t.ok(w.key)
 
     multi.close(function () {
-      var multi2 = multifeed(hypercore, storage, { valueEncoding: 'json' })
+      var multi2 = multifeed(storage, { valueEncoding: 'json' })
       multi2.writer('minuette', function (err, w2) {
         t.error(err)
         t.ok(w.key)
@@ -194,7 +194,7 @@ test('get localfeed by name across disk loads', function (t) {
 
 test('close', function (t) {
   var storage = tmp()
-  var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
+  var multi = multifeed(storage, { valueEncoding: 'json' })
 
   multi.writer('minuette', function (err, w) {
     t.error(err)
@@ -225,7 +225,7 @@ test('close after double-open', function (t) {
   })
 
   function openWriteClose (cb) {
-    var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
+    var multi = multifeed(storage, { valueEncoding: 'json' })
     multi.writer('minuette', function (err, w) {
       t.error(err)
       w.append({type: 'node'}, function (err) {
@@ -239,13 +239,11 @@ test('close after double-open', function (t) {
 test('can provide custom encryption key', function (t) {
   t.plan(2)
 
-  var core = hypercore(ram)
-  core.ready(function () {
-    var multi = multifeed(hypercore, ram, { valueEncoding: 'json', encryptionKey: core.key })
-    multi.ready(function () {
-      t.same(multi._opts.encryptionKey, core.key, 'encryption key set')
-      t.same(multi._root.key, core.key, 'fake key set')
-    })
+  var key = crypto.keyPair().publicKey
+  var multi = multifeed(ram, { valueEncoding: 'json', encryptionKey: key })
+  multi.ready(function () {
+    t.same(multi._opts.encryptionKey, key, 'encryption key set')
+    t.same(multi._root.key, key, 'fake key set')
   })
 })
 
@@ -258,8 +256,8 @@ test('replicate slow-to-open multifeeds', function (t) {
     }
   }
 
-  var m1 = multifeed(hypercore, slow(100), { valueEncoding: 'json' })
-  var m2 = multifeed(hypercore, slow(100), { valueEncoding: 'json' })
+  var m1 = multifeed(slow(100), { valueEncoding: 'json' })
+  var m2 = multifeed(slow(100), { valueEncoding: 'json' })
 
   var feedEvents1 = 0
   var feedEvents2 = 0

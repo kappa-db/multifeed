@@ -56,7 +56,7 @@ function replicate (a, b, cb) {
 var multifeed = require('multifeed')
 ```
 
-### var multi = multifeed(hypercore, storage[, opts])
+### var multi = multifeed(storage[, opts])
 
 Pass in the a hypercore module (`require('hypercore')`), a
 [random-access-storage](https://github.com/random-access-storage/random-access-storage)
@@ -66,6 +66,7 @@ and are the same as
 
 Valid `opts` include:
 - `opts.key` (string): optional encryption key to use during replication.
+- `opts.hypercore`: constructor of a hypercore implementation. `hypercore@8.x.x` is used from npm if not provided.
 
 ### multi.writer([name, ]cb)
 

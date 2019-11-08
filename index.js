@@ -1,3 +1,4 @@
+var hypercore = require('hypercore')
 var raf = require('random-access-file')
 var ram = require('random-access-memory')
 var path = require('path')
@@ -15,8 +16,9 @@ var defaultEncryptionKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0
 
 module.exports = Multifeed
 
-function Multifeed (hypercore, storage, opts) {
-  if (!(this instanceof Multifeed)) return new Multifeed(hypercore, storage, opts)
+function Multifeed (storage, opts) {
+  if (!(this instanceof Multifeed)) return new Multifeed(storage, opts)
+  hypercore = opts.hypercore || hypercore
   this._id = (opts||{})._id || Math.floor(Math.random() * 1000).toString(16)  // for debugging
   debug(this._id, 'multifeed @ ' + version)
   this._feeds = {}
