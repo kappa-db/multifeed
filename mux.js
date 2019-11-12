@@ -41,7 +41,6 @@ function Multiplexer (isInitiator, key, opts) {
       if (onFirstKey) {
         onFirstKey = false
         if (!self.stream.remoteVerified(key)) {
-          console.log(self._id, 'ERROR: Exchange key did not match')
           self._finalize(new Error('Exchange key did not match remote'))
           return
         }
@@ -59,7 +58,6 @@ function Multiplexer (isInitiator, key, opts) {
 
   function onHandshake (header) {
     debug(self._id + ' [REPLICATION] recv\'d handshake: ', JSON.stringify(header))
-    console.log('got handshake')
 
     if (!compatibleVersions(header.version, PROTOCOL_VERSION)) {
       debug(self._id + ' [REPLICATION] aborting; version mismatch (us='+PROTOCOL_VERSION+')')
