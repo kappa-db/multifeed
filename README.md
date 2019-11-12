@@ -10,10 +10,9 @@ exchanges the content of all of the hypercores.
 
 ```js
 var multifeed = require('multifeed')
-var hypercore = require('hypercore')
 var ram = require('random-access-memory')
 
-var multi = multifeed(hypercore, './db', { valueEncoding: 'json' })
+var multi = multifeed('./db', { valueEncoding: 'json' })
 
 // a multifeed starts off empty
 console.log(multi.feeds().length)             // => 0
@@ -58,14 +57,10 @@ var multifeed = require('multifeed')
 
 ### var multi = multifeed(storage[, opts])
 
-Pass in the a hypercore module (`require('hypercore')`), a
-[random-access-storage](https://github.com/random-access-storage/random-access-storage)
-backend, and options. Included `opts` are passed into new hypercores created,
-and are the same as
-[hypercore](https://github.com/mafintosh/hypercore#var-feed--hypercorestorage-key-options)'s.
+Pass in a [random-access-storage](https://github.com/random-access-storage/random-access-storage) backend, and options. Included `opts` are passed into new hypercores created, and are the same as [hypercore](https://github.com/mafintosh/hypercore#var-feed--hypercorestorage-key-options)'s.
 
 Valid `opts` include:
-- `opts.key` (string): optional encryption key to use during replication.
+- `opts.encryptionKey` (string): optional encryption key to use during replication. If not provided, a default insecure key will be used.
 - `opts.hypercore`: constructor of a hypercore implementation. `hypercore@8.x.x` is used from npm if not provided.
 
 ### multi.writer([name, ]cb)
@@ -95,14 +90,14 @@ Only populated once `multi.ready(fn)` is fired.
 
 Fetch a feed by its key `key` (a `Buffer` or hex string).
 
-### var stream = multi.replicate([opts])
+### var stream = multi.replicate(isInitiator, [opts])
 
-Create a duplex stream for replication.
+Create an encrypted duplex stream for replication.
+
+Ensure that `isInitiator` to `true` to one side, and `false` on the other.
 
 Works just like hypercore, except *all* local hypercores are exchanged between
 replication endpoints.
-
-**Note**: this stream is *not* an encrypted channel.
 
 ### multi.on('feed', function (feed, name) { ... })
 
@@ -111,8 +106,6 @@ Emitted whenever a new feed is added, whether locally or remotely.
 ## multi.close(cb)
 
 Close all file resources being held by the multifeed instance. `cb` is called once this is complete.
-
-**NOTE**: Once a multifeed is closed, use of the rest of the API is basically undefined behaviour.
 
 ## multi.closed
 
