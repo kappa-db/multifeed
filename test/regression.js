@@ -5,6 +5,8 @@ var ram = require('random-access-memory')
 var ral = require('random-access-latency')
 var tmp = require('tmp').tmpNameSync
 var pump = require('pump')
+var crypto = require('crypto')
+var fs = require('fs')
 
 test('regression: concurrency of writer creation', function (t) {
   t.plan(3)
@@ -340,4 +342,31 @@ test('regression: sync two single-core multifeeds /w different storage speeds', 
     t.equals(m1.feeds().length, 2, '2 feeds')
     t.equals(m2.feeds().length, 2, '2 feeds')
   }
+})
+
+test('regression: ensure encryption key is not written to disk', function (t) {
+  t.plan(6)
+
+  var storage = tmp()
+  var key = crypto.randomBytes(32)
+
+  var multi = multifeed(hypercore, storage, {
+    encryptionKey: key,
+    valueEncoding: 'json'
+  })
+
+  multi.writer(function (err, w) {
+    t.error(err)
+    w.append('foo', function (err) {
+      t.error(err)
+      multi.close(function (err) {
+        t.error(err)
+        fs.readdir(storage, function (err, res) {
+          t.error(err)
+          t.equals(res.length, 1)
+          t.equals(res[0], '0')
+        })
+      })
+    })
+  })
 })

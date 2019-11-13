@@ -1,4 +1,5 @@
 var raf = require('random-access-file')
+var ram = require('random-access-memory')
 var path = require('path')
 var events = require('events')
 var inherits = require('inherits')
@@ -57,7 +58,7 @@ function Multifeed (hypercore, storage, opts) {
     debug(self._id, 'Using encryption key:', encryptionKey.toString('hex'))
 
     var storageName = encryptionKey.toString('hex')
-    var feed = hypercore(self._storage(storageName), encryptionKey)
+    var feed = hypercore(ram, encryptionKey)
 
     feed.on('error', function (err) {
       self.emit('error', err)
