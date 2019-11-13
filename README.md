@@ -94,7 +94,7 @@ Fetch a feed by its key `key` (a `Buffer` or hex string).
 
 Create an encrypted duplex stream for replication.
 
-Ensure that `isInitiator` to `true` to one side, and `false` on the other.
+Ensure that `isInitiator` to `true` to one side, and `false` on the other. This is necessary for setting up the encryption mechanism.
 
 Works just like hypercore, except *all* local hypercores are exchanged between
 replication endpoints.
