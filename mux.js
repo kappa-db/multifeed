@@ -13,6 +13,10 @@ var MANIFEST = 'MANIFEST'
 var REQUEST_FEEDS = 'REQUEST_FEEDS'
 var REPLICATE_FEEDS = 'REPLICATE_FEEDS'
 
+// errors
+var ERR_VERSION_MISMATCH = 'ERR_VERSION_MISMATCH'
+var ERR_CLIENT_MISMATCH = 'ERR_CLIENT_MISMATCH'
+
 // XXX: hypercore-protocol currently requires extensions be specified in
 // alphabetical order.
 var SupportedExtensions = [
@@ -60,13 +64,21 @@ function Multiplexer (key, opts) {
     debug(self._id + ' [REPLICATION] recv\'d handshake: ', JSON.stringify(header))
     if (!compatibleVersions(header.version, PROTOCOL_VERSION)) {
       debug(self._id + ' [REPLICATION] aborting; version mismatch (us='+PROTOCOL_VERSION+')')
-      self._finalize(new Error('protocol version mismatch! us='+PROTOCOL_VERSION + ' them=' + header.version))
+      var err = new Error('protocol version mismatch! us='+PROTOCOL_VERSION + ' them=' + header.version)
+      err.code = ERR_VERSION_MISMATCH
+      err.usVersion = PROTOCOL_VERSION
+      err.themVersion = header.version
+      self._finalize(err)
       return
     }
 
     if (header.client != MULTIFEED) {
       debug(self._id + ' [REPLICATION] aborting; Client mismatch! expected ', MULTIFEED, 'but got', header.client)
-      self._finalize(new Error('Client mismatch! expected ' + MULTIFEED + ' but got ' + header.client))
+      var err = new Error('Client mismatch! expected ' + MULTIFEED + ' but got ' + header.client)
+      err.code = ERR_CLIENT_MISMATCH
+      err.usClient = MULTIFEED
+      err.themClient = header.client
+      self._finalize(err)
       return
     }
 

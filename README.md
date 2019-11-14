@@ -117,6 +117,21 @@ Close all file resources being held by the multifeed instance. `cb` is called on
 
 `true` if `close()` was run successfully, falsey otherwise.
 
+# Errors
+
+The duplex stream returned by `.replicate()` can emit, in addition to regular
+stream errors, two fatal errors specific to multifeed:
+
+- `ERR_VERSION_MISMATCH`
+  - `err.code = 'ERR_VERSION_MISMATCH'`
+  - `err.usVersion = 'X.Y.Z'` (semver)
+  - `err.themVersion = 'A.B.C'` (semver)
+
+- `ERR_CLIENT_MISMATCH`
+  - `err.code = 'ERR_CLIENT_MISMATCH'`
+  - `err.usClient = 'MULTIFEED'`
+  - `err.themClient = '???'`
+
 ## Install
 
 With [npm](https://npmjs.org/) installed, run
