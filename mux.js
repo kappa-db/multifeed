@@ -136,7 +136,6 @@ Multiplexer.prototype.ready = function(cb) {
 Multiplexer.prototype._finalize = function(err) {
   if (err) {
     debug(this._id + ' [REPLICATION] destroyed due to', err)
-    this.emit('error', err)
     this.stream.destroy(err)
   } else {
     debug(this._id + ' [REPLICATION] finalized', err)
