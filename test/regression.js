@@ -1,6 +1,6 @@
 var test = require('tape')
 var multifeed = require('..')
-var crypto = require('hypercore-crypto')
+var hypercrypto = require('hypercore-crypto')
 var ram = require('random-access-memory')
 var ral = require('random-access-latency')
 var tmp = require('tmp').tmpNameSync
@@ -245,7 +245,7 @@ test('regression: replicate before multifeed is ready', function (t) {
 })
 
 test('regression: MFs with different root keys cannot replicate', function (t) {
-  var key = crypto.keyPair().publicKey
+  var key = hypercrypto.keyPair().publicKey
   var m1, m2
 
   m1 = multifeed(ram, { valueEncoding: 'json', encryptionKey: key })
@@ -348,7 +348,7 @@ test('regression: ensure encryption key is not written to disk', function (t) {
   var storage = tmp()
   var key = crypto.randomBytes(32)
 
-  var multi = multifeed(hypercore, storage, {
+  var multi = multifeed(storage, {
     encryptionKey: key,
     valueEncoding: 'json'
   })
