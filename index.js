@@ -8,6 +8,7 @@ var mutexify = require('mutexify')
 var through = require('through2')
 var debug = require('debug')('multifeed')
 var multiplexer = require('./mux')
+var version = require('./package.json').version
 
 // Key-less constant hypercore to bootstrap hypercore-protocol replication.
 var defaultEncryptionKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
@@ -17,7 +18,7 @@ module.exports = Multifeed
 function Multifeed (hypercore, storage, opts) {
   if (!(this instanceof Multifeed)) return new Multifeed(hypercore, storage, opts)
   this._id = (opts||{})._id || Math.floor(Math.random() * 1000).toString(16)  // for debugging
-  debug(this._id, 'multifeed @ ' + require(path.join(__dirname,'package.json')).version)
+  debug(this._id, 'multifeed @ ' + version)
   this._feeds = {}
   this._feedKeyToFeed = {}
   this._streams = []
