@@ -2,9 +2,20 @@
 
 > multi-writer hypercore
 
-Small module that manages multiple hypercores: feeds you create locally are
-writeable, others' are readonly. Replicating with another multifeed peers
-exchanges the content of all of the hypercores.
+Multifeed lets you:
+
+1. manage many hypercores, stored together
+2. replicate a local set of hypercores with a remote set of hypercores (union-syle)
+
+It solves the problem of [hypercore](https://github.com/mafintosh/hypercore)
+only allowing one writer by making it easy to manage and sync a set of
+hypercores -- by a variety of authors -- across peers.
+
+Replication works by extending the regular hypercore exchange mechanism to
+include a meta-exchange, where peers share information about the feeds they
+have locally, and choose which of the remote feeds they'd like to download in
+exchange. Right now, the replication mechanism defauls to sharing all local
+feeds and downloading all remote feeds.
 
 ## Usage
 
