@@ -1,3 +1,4 @@
+var hypercore = require('hypercore')
 var raf = require('random-access-file')
 var ram = require('random-access-memory')
 var path = require('path')
@@ -15,8 +16,8 @@ var defaultEncryptionKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0
 
 module.exports = Multifeed
 
-function Multifeed (hypercore, storage, opts) {
-  if (!(this instanceof Multifeed)) return new Multifeed(hypercore, storage, opts)
+function Multifeed (storage, opts) {
+  if (!(this instanceof Multifeed)) return new Multifeed(storage, opts)
   this._id = (opts||{})._id || Math.floor(Math.random() * 1000).toString(16)  // for debugging
   debug(this._id, 'multifeed @ ' + version)
   this._feeds = {}
@@ -28,7 +29,7 @@ function Multifeed (hypercore, storage, opts) {
   // Support legacy opts.key
   if (opts.key) opts.encryptionKey = opts.key
 
-  this._hypercore = hypercore
+  this._hypercore = opts.hypercore || hypercore
   this._opts = opts
 
   this.writerLock = mutexify()
@@ -228,7 +229,7 @@ Multifeed.prototype.feed = function (key) {
   else return null
 }
 
-Multifeed.prototype.replicate = function (opts) {
+Multifeed.prototype.replicate = function (isInitiator, opts) {
   if (!this._root) {
     var tmp = through()
     process.nextTick(function () {
@@ -239,7 +240,7 @@ Multifeed.prototype.replicate = function (opts) {
 
   if (!opts) opts = {}
   var self = this
-  var mux = multiplexer(self._root.key, Object.assign({}, opts, {_id:this._id}))
+  var mux = multiplexer(isInitiator, self._root.key, Object.assign({}, opts, {_id:this._id}))
 
   // Add key exchange listener
   var onManifest = function (m) {

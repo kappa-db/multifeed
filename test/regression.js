@@ -1,6 +1,6 @@
 var test = require('tape')
-var hypercore = require('hypercore')
 var multifeed = require('..')
+var hypercrypto = require('hypercore-crypto')
 var ram = require('random-access-memory')
 var ral = require('random-access-latency')
 var tmp = require('tmp').tmpNameSync
@@ -14,7 +14,7 @@ test('regression: concurrency of writer creation', function (t) {
   var storage = tmp()
   var key
 
-  var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
+  var multi = multifeed(storage, { valueEncoding: 'json' })
 
   multi.writer('minuette', function (err, w) {
     t.error(err)
@@ -28,8 +28,8 @@ test('regression: concurrency of writer creation', function (t) {
 })
 
 test('regression: MF with no writer replicate to MF with 1 writer', function (t) {
-  var m1 = multifeed(hypercore, ram, { valueEncoding: 'json' })
-  var m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
 
   function setup1 (m, buf, cb) {
     m.writer(function (err, w) {
@@ -76,9 +76,9 @@ test('regression: MF with no writer replicate to MF with 1 writer', function (t)
 
   setup1(m1, 'foo', function () {
     setup2(m2, 'bar', function () {
-      var r = m1.replicate()
+      var r = m1.replicate(true)
       r.once('end', done)
-      var s = m2.replicate()
+      var s = m2.replicate(false)
       s.once('end', done)
       r.pipe(s).pipe(r)
 
@@ -111,8 +111,8 @@ test('regression: MF with no writer replicate to MF with 1 writer', function (t)
 test('regression: start replicating before feeds are loaded', function (t) {
   t.plan(22)
 
-  var m1 = multifeed(hypercore, ram, { valueEncoding: 'json' })
-  var m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
 
   var feedEvents1 = 0
   var feedEvents2 = 0
@@ -142,8 +142,8 @@ test('regression: start replicating before feeds are loaded', function (t) {
 
   setup(m1, 'foo', function () {
     setup(m2, 'bar', function () {
-      var r = m1.replicate()
-      r.pipe(m2.replicate()).pipe(r)
+      var r = m1.replicate(true)
+      r.pipe(m2.replicate(false)).pipe(r)
         .once('end', check)
     })
   })
@@ -166,9 +166,9 @@ test('regression: start replicating before feeds are loaded', function (t) {
 
 test('regression: announce new feed on existing connections', function(t) {
   t.plan(21);
-  var m1 = multifeed(hypercore, ram, { valueEncoding: 'json' })
-  var m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })
-  var m3 = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
+  var m3 = multifeed(ram, { valueEncoding: 'json' })
 
   setup(m1, "First", function() {
     setup(m2, "Second", function() {
@@ -204,12 +204,12 @@ test('regression: announce new feed on existing connections', function(t) {
         })
 
         // m1 and m2 are now live connected.
-        r1 = m1.replicate({live: true})
-        r1.pipe(m2.replicate({live: true})).pipe(r1)
+        r1 = m1.replicate(true, {live: true})
+        r1.pipe(m2.replicate(false, {live: true})).pipe(r1)
 
         // When m3 is attached to m2, m2 should forward m3's writer to m1.
-        r2 = m3.replicate({live:true})
-        r2.pipe(m2.replicate({live:true})).pipe(r2)
+        r2 = m3.replicate(true, {live:true})
+        r2.pipe(m2.replicate(false, {live:true})).pipe(r2)
 
       })
     })
@@ -237,29 +237,27 @@ test('regression: replicate before multifeed is ready', function (t) {
   var storage = tmp()
   var key
 
-  var multi = multifeed(hypercore, storage, { valueEncoding: 'json' })
-  var res = multi.replicate()
+  var multi = multifeed(storage, { valueEncoding: 'json' })
+  var res = multi.replicate(true)
   res.on('error', function () {
     t.ok('error hit')
   })
 })
 
 test('regression: MFs with different root keys cannot replicate', function (t) {
-  var core = hypercore(ram)
+  var key = hypercrypto.keyPair().publicKey
   var m1, m2
 
-  core.ready(function () {
-    m1 = multifeed(hypercore, ram, { valueEncoding: 'json', encryptionKey: core.key })
-    m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })  // default encryption key
+  m1 = multifeed(ram, { valueEncoding: 'json', encryptionKey: key })
+  m2 = multifeed(ram, { valueEncoding: 'json' })  // default encryption key
 
-    setup(m1, 'foo', function () {
-      setup(m2, 'bar', function () {
-        var r = m1.replicate()
-        var s = m2.replicate()
-        pump(r, s, r, function (err) {
-          t.same(err.toString(), 'Error: First shared hypercore must be the same')
-          t.end()
-        })
+  setup(m1, 'foo', function () {
+    setup(m2, 'bar', function () {
+      var r = m1.replicate(true)
+      var s = m2.replicate(false)
+      pump(r, s, r, function (err) {
+        t.same(err.toString(), 'Error: Exchange key did not match remote')
+        t.end()
       })
     })
   })
@@ -285,7 +283,7 @@ test('regression: MFs with different root keys cannot replicate', function (t) {
 })
 
 test('regression: calling close while closing should not throw errors', function (t) {
-  var multi = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var multi = multifeed(ram, { valueEncoding: 'json' })
   multi.ready(function () {
     multi.writer('default', function (err, wr) {
       t.error(err)
@@ -317,8 +315,8 @@ test('regression: sync two single-core multifeeds /w different storage speeds', 
     }
   }
 
-  var m1 = multifeed(hypercore, slowram(1), { valueEncoding: 'json' })
-  var m2 = multifeed(hypercore, slowram(500), { valueEncoding: 'json' })
+  var m1 = multifeed(slowram(1), { valueEncoding: 'json' })
+  var m2 = multifeed(slowram(500), { valueEncoding: 'json' })
 
   function setup (m, cb) {
     m.writer(function (err, w) {
@@ -329,8 +327,8 @@ test('regression: sync two single-core multifeeds /w different storage speeds', 
 
   setup(m1, function () {
     setup(m2, function () {
-      var r = m1.replicate()
-      var s = m2.replicate()
+      var r = m1.replicate(true)
+      var s = m2.replicate(false)
       pump(r, s, r, function (err) {
         t.error(err)
         check()
@@ -350,7 +348,7 @@ test('regression: ensure encryption key is not written to disk', function (t) {
   var storage = tmp()
   var key = crypto.randomBytes(32)
 
-  var multi = multifeed(hypercore, storage, {
+  var multi = multifeed(storage, {
     encryptionKey: key,
     valueEncoding: 'json'
   })
