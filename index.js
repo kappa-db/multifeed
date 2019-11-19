@@ -174,11 +174,16 @@ Multifeed.prototype._loadFeeds = function (cb) {
   next(0)
 }
 
-Multifeed.prototype.writer = function (name, cb) {
+Multifeed.prototype.writer = function (name, keypair, cb) {
   if (typeof name === 'function' && !cb) {
     cb = name
     name = undefined
   }
+  if (typeof keypair === 'function' && !cb) {
+    cb = keypair
+    keypair = undefined
+  }
+
   var self = this
 
   this.ready(function () {
@@ -205,7 +210,9 @@ Multifeed.prototype.writer = function (name, cb) {
           return
         }
 
-        var feed = self._hypercore(storage, self._opts)
+        var feed = keypair
+          ? self._hypercore(storage, keypair.publicKey, Object.assign(self._opts, { secretKey: keypair.secretKey }))
+          : self._hypercore(storage, self._opts)
 
         feed.ready(function () {
           self._addFeed(feed, String(idx))
