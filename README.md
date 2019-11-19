@@ -17,6 +17,10 @@ have locally, and choose which of the remote feeds they'd like to download in
 exchange. Right now, the replication mechanism defauls to sharing all local
 feeds and downloading all remote feeds.
 
+Small module that manages multiple hypercores: feeds you create locally are
+writeable, others' are readonly. Replicating with another multifeed peers
+exchanges the content of all of the hypercores.
+
 ## Usage
 
 ```js
@@ -74,7 +78,7 @@ Valid `opts` include:
 - `opts.encryptionKey` (string): optional encryption key to use during replication. If not provided, a default insecure key will be used.
 - `opts.hypercore`: constructor of a hypercore implementation. `hypercore@8.x.x` is used from npm if not provided.
 
-### multi.writer([name, ]cb)
+### multi.writer([name], [keypair], cb)
 
 If no `name` is given, a new local writeable feed is created and returned via
 `cb`.
@@ -89,6 +93,8 @@ var content = multi.writer('content')  // created if doesn't exist
 
 main === multi.writer('main')          // => true
 ```
+
+Optionally, a `keypair` object can be passed, with a custom keypair for the new writer.  This should have properies `keypair.publicKey` and `keypair.secretKey` both of which should be buffers.
 
 ### var feeds = multi.feeds()
 
