@@ -308,3 +308,28 @@ test('replicate slow-to-open multifeeds', function (t) {
     t.equals(feedEvents2, 2)
   }
 })
+
+test('can create writer with custom keypair', function (t) {
+  t.plan(6)
+
+  const keypair = {
+    publicKey: Buffer.from('ce1f0639f6559736d5c98f9df9af111ff20f0980674297e4eb40cc8f00f1157e', 'hex'),
+    secretKey: Buffer.from('559f807745b2dd136ec96ebdffa81f0631bfc4bc6ee4bc86f5666b24db91665ace1f0639f6559736d5c98f9df9af111ff20f0980674297e4eb40cc8f00f1157e', 'hex')
+  }
+
+  var multi = multifeed(ram, { valueEncoding: 'json' })
+  multi.ready(function () {
+    multi.writer('moose', keypair, function (err, w) {
+      t.error(err, 'valid writer created')
+      t.same(w.key.toString('hex'), keypair.publicKey.toString('hex'), 'public keys match')
+      w.append('foo', function (err) {
+        t.error(err, 'no error when appending to feed')
+        w.get(0, function (err, data) {
+          t.error(err)
+          t.equals(data.toString(), 'foo')
+          t.deepEquals(multi.feeds(), [w])
+        })
+      })
+    })
+  })
+})
