@@ -74,7 +74,7 @@ Valid `opts` include:
 - `opts.encryptionKey` (string): optional encryption key to use during replication. If not provided, a default insecure key will be used.
 - `opts.hypercore`: constructor of a hypercore implementation. `hypercore@8.x.x` is used from npm if not provided.
 
-### multi.writer([name, ]cb)
+### multi.writer([name], [options], cb)
 
 If no `name` is given, a new local writeable feed is created and returned via
 `cb`.
@@ -89,6 +89,9 @@ var content = multi.writer('content')  // created if doesn't exist
 
 main === multi.writer('main')          // => true
 ```
+
+`options` is an optional object which may contain: 
+- `options.keypair` - an object with a custom keypair for the new writer.  This should have properties `keypair.publicKey` and `keypair.secretKey`, both of which should be buffers.
 
 ### var feeds = multi.feeds()
 
