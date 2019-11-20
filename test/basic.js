@@ -319,7 +319,7 @@ test('can create writer with custom keypair', function (t) {
 
   var multi = multifeed(ram, { valueEncoding: 'json' })
   multi.ready(function () {
-    multi.writer('moose', keypair, function (err, w) {
+    multi.writer('moose', { keypair }, function (err, w) {
       t.error(err, 'valid writer created')
       t.same(w.key.toString('hex'), keypair.publicKey.toString('hex'), 'public keys match')
       w.append('foo', function (err) {
