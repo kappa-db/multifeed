@@ -310,7 +310,7 @@ test('replicate slow-to-open multifeeds', function (t) {
 })
 
 test('can create writer with custom keypair', function (t) {
-  t.plan(6)
+  t.plan(7)
 
   const keypair = {
     publicKey: Buffer.from('ce1f0639f6559736d5c98f9df9af111ff20f0980674297e4eb40cc8f00f1157e', 'hex'),
@@ -322,6 +322,7 @@ test('can create writer with custom keypair', function (t) {
     multi.writer('moose', { keypair }, function (err, w) {
       t.error(err, 'valid writer created')
       t.same(w.key.toString('hex'), keypair.publicKey.toString('hex'), 'public keys match')
+      t.same(w.secretKey.toString('hex'), keypair.secretKey.toString('hex'), 'secret keys match')
       w.append('foo', function (err) {
         t.error(err, 'no error when appending to feed')
         w.get(0, function (err, data) {
