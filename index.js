@@ -174,17 +174,19 @@ Multifeed.prototype._loadFeeds = function (cb) {
   next(0)
 }
 
-Multifeed.prototype.writer = function (name, keypair, cb) {
+Multifeed.prototype.writer = function (name, opts, cb) {
   if (typeof name === 'function' && !cb) {
     cb = name
     name = undefined
+    opts = {}
   }
-  if (typeof keypair === 'function' && !cb) {
-    cb = keypair
-    keypair = undefined
+  if (typeof opts === 'function' && !cb) {
+    cb = opts
+    opts = {}
   }
 
   var self = this
+  const keypair = opts.keypair
 
   this.ready(function () {
     // Short-circuit if already loaded
