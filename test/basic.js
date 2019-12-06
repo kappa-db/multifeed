@@ -334,3 +334,56 @@ test('can create writer with custom keypair', function (t) {
     })
   })
 })
+
+test('can replicate with custom keypairs', function (t) {
+  t.plan(16)
+
+  const keypair1 = {
+    publicKey: Buffer.from('731e8277432cad15c39f275de593a50cf2e689b0139f2d1ad2a130b84a8b1407', 'hex'),
+    secretKey: Buffer.from('bf54c2aa004c76e7575839ff1fd7c242f9ba14b019afeed0e0536a6c3483e78c731e8277432cad15c39f275de593a50cf2e689b0139f2d1ad2a130b84a8b1407', 'hex')
+  }
+
+  const keypair2 = {
+    publicKey: Buffer.from('ce1f0639f6559736d5c98f9df9af111ff20f0980674297e4eb40cc8f00f1157e', 'hex'),
+    secretKey: Buffer.from('559f807745b2dd136ec96ebdffa81f0631bfc4bc6ee4bc86f5666b24db91665ace1f0639f6559736d5c98f9df9af111ff20f0980674297e4eb40cc8f00f1157e', 'hex')
+  }
+
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
+
+  setup(m1, keypair1, 'foo', () => {
+    setup(m2, keypair2, 'bar', (r) => {
+      var r = m1.replicate(true)
+      r.pipe(m2.replicate(false)).pipe(r)
+        .once('end', check)
+    })
+  })
+
+  function setup (m, keypair, buf, cb) {
+    m.writer('local', { keypair }, function (err, w) {
+      t.error(err)
+      w.append(buf, function (err) {
+        t.error(err)
+        w.get(0, function (err, data) {
+          t.error(err)
+          t.equals(data, buf)
+          t.deepEquals(m.feeds(), [w])
+          cb()
+        })
+      })
+    })
+  }
+
+  function check () {
+    t.equals(m1.feeds().length, 2)
+    t.equals(m2.feeds().length, 2)
+    m1.feeds()[1].get(0, function (err, data) {
+      t.error(err)
+      t.equals(data, 'foo')
+    })
+    m2.feeds()[1].get(0, function (err, data) {
+      t.error(err)
+      t.equals(data, 'bar')
+    })
+  }
+})
