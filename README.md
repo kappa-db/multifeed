@@ -14,7 +14,7 @@ hypercores -- by a variety of authors -- across peers.
 Replication works by extending the regular hypercore exchange mechanism to
 include a meta-exchange, where peers share information about the feeds they
 have locally, and choose which of the remote feeds they'd like to download in
-exchange. Right now, the replication mechanism defauls to sharing all local
+exchange. Right now, the replication mechanism defaults to sharing all local
 feeds and downloading all remote feeds.
 
 ## Usage
