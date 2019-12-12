@@ -17,7 +17,7 @@
   "dependencies": {
     "debug": "^4.1.0",
     "hypercore": "^8.3.0",
-    "hypercore-protocol": "^7.6.0",
+    "hypercore-protocol": "^7.7.1",
     "inherits": "^2.0.3",
     "mutexify": "^1.2.0",
     "random-access-file": "^2.0.1",

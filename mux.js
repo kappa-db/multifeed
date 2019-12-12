@@ -36,7 +36,7 @@ function Multiplexer (isInitiator, key, opts) {
 
   var discoveryKey = crypto.discoveryKey(key)
   var onFirstKey = true
-  var stream = this.stream = new Protocol(isInitiator, {
+  var stream = this.stream = new Protocol(isInitiator, Object.assign({}, opts, {
     ondiscoverykey: function (key) {
       if (onFirstKey) {
         onFirstKey = false
@@ -46,7 +46,7 @@ function Multiplexer (isInitiator, key, opts) {
         }
       }
     }
-  })
+  }))
 
   this._handshakeExt = this.stream.registerExtension(EXT_HANDSHAKE, {
     onmessage: onHandshake,
