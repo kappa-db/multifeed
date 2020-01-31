@@ -256,6 +256,11 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
         fStream.once('error', cleanup)
       })
     })
+
+    if (feeds.length === 0) {
+      debug('[REPLICATION] terminating mux: no feeds to sync')
+      self._feed.close()
+    }
   }
 }
 
