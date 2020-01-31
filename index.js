@@ -12,13 +12,13 @@ var multiplexer = require('./mux')
 var version = require('./package.json').version
 
 // Key-less constant hypercore to bootstrap hypercore-protocol replication.
-var defaultEncryptionKey = new Buffer('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
+var defaultEncryptionKey = Buffer.from('bee80ff3a4ee5e727dc44197cb9d25bf8f19d50b0f3ad2984cfe5b7d14e75de7', 'hex')
 
 module.exports = Multifeed
 
 function Multifeed (storage, opts) {
   if (!(this instanceof Multifeed)) return new Multifeed(storage, opts)
-  this._id = (opts||{})._id || Math.floor(Math.random() * 1000).toString(16)  // for debugging
+  this._id = (opts || {})._id || Math.floor(Math.random() * 1000).toString(16) // for debugging
   debug(this._id, 'multifeed @ ' + version)
   this._feeds = {}
   this._feedKeyToFeed = {}
@@ -59,7 +59,6 @@ function Multifeed (storage, opts) {
 
     debug(self._id, 'Using encryption key:', encryptionKey.toString('hex'))
 
-    var storageName = encryptionKey.toString('hex')
     var feed = hypercore(ram, encryptionKey)
 
     feed.on('error', function (err) {
@@ -137,10 +136,10 @@ Multifeed.prototype._loadFeeds = function (cb) {
   // at position 0 implies non-existance of the hypercore.
   var pending = 1
   function next (n) {
-    var storage = self._storage(''+n)
+    var storage = self._storage('' + n)
     var st = storage('key')
     st.read(0, 4, function (err) {
-      if (err) return done()  // means there are no more feeds to read
+      if (err) return done() // means there are no more feeds to read
       debug(self._id + ' [INIT] loading feed #' + n)
       pending++
       var feed = self._hypercore(storage, self._opts)
@@ -199,7 +198,7 @@ Multifeed.prototype.writer = function (name, opts, cb) {
 
     self.writerLock(function (release) {
       var len = Object.keys(self._feeds).length
-      var storage = self._storage(''+len)
+      var storage = self._storage('' + len)
 
       var idx = name || String(len)
 
@@ -249,7 +248,7 @@ Multifeed.prototype.replicate = function (isInitiator, opts) {
 
   if (!opts) opts = {}
   var self = this
-  var mux = multiplexer(isInitiator, self._root.key, Object.assign({}, opts, {_id:this._id}))
+  var mux = multiplexer(isInitiator, self._root.key, Object.assign({}, opts, {_id: this._id}))
 
   // Add key exchange listener
   var onManifest = function (m) {
@@ -277,10 +276,10 @@ Multifeed.prototype.replicate = function (isInitiator, opts) {
   mux.on('replicate', onReplicate)
 
   // Start streaming
-  this.ready(function(err){
+  this.ready(function (err) {
     if (err) return mux.stream.destroy(err)
     if (mux.stream.destroyed) return
-    mux.ready(function(){
+    mux.ready(function () {
       var keys = values(self._feeds).map(function (feed) { return feed.key.toString('hex') })
       mux.offerFeeds(keys)
     })
@@ -356,14 +355,12 @@ Multifeed.prototype.replicate = function (isInitiator, opts) {
 
 Multifeed.prototype._forwardLiveFeedAnnouncements = function (feed, name) {
   if (!this._streams.length) return // no-op if no live-connections
-  var self = this
-  var hexKey = feed.key.toString('hex');
+  var hexKey = feed.key.toString('hex')
   // Tell each remote that we have a new key available unless
   // it's already being replicated
-  this._streams.forEach(function(mux) {
+  this._streams.forEach(function (mux) {
     if (mux.knownFeeds().indexOf(hexKey) === -1) {
-      self._streams
-      debug("Forwarding new feed to existing peer:", hexKey)
+      debug('Forwarding new feed to existing peer:', hexKey)
       mux.offerFeeds([hexKey])
     }
   })
@@ -392,7 +389,6 @@ function readStringFromStorage (storage, cb) {
     })
   })
 }
-
 
 function values (obj) {
   return Object.keys(obj).map(function (k) { return obj[k] })

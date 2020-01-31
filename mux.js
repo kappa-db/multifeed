@@ -1,4 +1,3 @@
-var crypto = require('hypercore-crypto')
 var Protocol = require('hypercore-protocol')
 var readify = require('./ready')
 var inherits = require('inherits')
@@ -34,7 +33,6 @@ function Multiplexer (isInitiator, key, opts) {
   self._remoteOffer = []
   self._activeFeedStreams = {}
 
-  var discoveryKey = crypto.discoveryKey(key)
   var onFirstKey = true
   var stream = this.stream = new Protocol(isInitiator, Object.assign({}, opts, {
     ondiscoverykey: function (key) {
@@ -42,7 +40,6 @@ function Multiplexer (isInitiator, key, opts) {
         onFirstKey = false
         if (!self.stream.remoteVerified(key)) {
           self._finalize(new Error('Exchange key did not match remote'))
-          return
         }
       }
     }
@@ -58,10 +55,11 @@ function Multiplexer (isInitiator, key, opts) {
 
   function onHandshake (header) {
     debug(self._id + ' [REPLICATION] recv\'d handshake: ', JSON.stringify(header))
+    var err
 
     if (!compatibleVersions(header.version, PROTOCOL_VERSION)) {
-      debug(self._id + ' [REPLICATION] aborting; version mismatch (us='+PROTOCOL_VERSION+')')
-      var err = new Error('protocol version mismatch! us='+PROTOCOL_VERSION + ' them=' + header.version)
+      debug(self._id + ' [REPLICATION] aborting; version mismatch (us=' + PROTOCOL_VERSION + ')')
+      err = new Error('protocol version mismatch! us=' + PROTOCOL_VERSION + ' them=' + header.version)
       err.code = ERR_VERSION_MISMATCH
       err.usVersion = PROTOCOL_VERSION
       err.themVersion = header.version
@@ -69,9 +67,9 @@ function Multiplexer (isInitiator, key, opts) {
       return
     }
 
-    if (header.client != MULTIFEED) {
+    if (header.client !== MULTIFEED) {
       debug(self._id + ' [REPLICATION] aborting; Client mismatch! expected ', MULTIFEED, 'but got', header.client)
-      var err = new Error('Client mismatch! expected ' + MULTIFEED + ' but got ' + header.client)
+      err = new Error('Client mismatch! expected ' + MULTIFEED + ' but got ' + header.client)
       err.code = ERR_CLIENT_MISMATCH
       err.usClient = MULTIFEED
       err.themClient = header.client
@@ -86,7 +84,7 @@ function Multiplexer (isInitiator, key, opts) {
   }
 
   // Open a virtual feed that has the key set to the shared key.
-  var feed = this._feed = stream.open(key, {
+  this._feed = stream.open(key, {
     onopen: function () {
       onFirstKey = false
       if (!stream.remoteVerified(key)) {
@@ -138,7 +136,7 @@ function Multiplexer (isInitiator, key, opts) {
     encoding: 'json'
   })
 
-  if (!self._opts.live ) {
+  if (!self._opts.live) {
     self.stream.on('prefinalize', function () {
       self._feed.close()
       debug(self._id + ' [REPLICATION] feed finish/prefinalize (' + self.stream.prefinalize._tick + ')')
@@ -146,7 +144,7 @@ function Multiplexer (isInitiator, key, opts) {
   }
 
   this._ready = readify(function (done) {
-    self.on('ready', function(remote){
+    self.on('ready', function (remote) {
       debug(self._id + ' [REPLICATION] remote connected and ready')
       done(remote)
     })
@@ -155,11 +153,11 @@ function Multiplexer (isInitiator, key, opts) {
 
 inherits(Multiplexer, events.EventEmitter)
 
-Multiplexer.prototype.ready = function(cb) {
+Multiplexer.prototype.ready = function (cb) {
   this._ready(cb)
 }
 
-Multiplexer.prototype._finalize = function(err) {
+Multiplexer.prototype._finalize = function (err) {
   if (err) {
     debug(this._id + ' [REPLICATION] destroyed due to', err)
     this.stream.emit('error', err)
@@ -195,7 +193,7 @@ Multiplexer.prototype.requestFeeds = function (keys) {
 
 Multiplexer.prototype._requestHandler = function (keys) {
   var self = this
-  var filtered = keys.filter(function(key) {
+  var filtered = keys.filter(function (key) {
     if (self._localOffer.indexOf(key) === -1) {
       debug('[REPLICATION] Warning, remote requested feed that is not in offer', key)
       return false
@@ -215,7 +213,7 @@ Multiplexer.prototype._requestHandler = function (keys) {
 
 Multiplexer.prototype._onRemoteReplicate = function (keys) {
   var self = this
-  var filtered = keys.filter(function(key) {
+  var filtered = keys.filter(function (key) {
     return self._requestedFeeds.indexOf(key) !== -1
   })
 
@@ -225,7 +223,7 @@ Multiplexer.prototype._onRemoteReplicate = function (keys) {
 
 // Initializes new replication streams for feeds and joins their streams into
 // the main stream.
-Multiplexer.prototype._replicateFeeds = function(keys) {
+Multiplexer.prototype._replicateFeeds = function (keys) {
   var self = this
   keys = uniq(keys)
   debug(this._id, '[REPLICATION] _replicateFeeds', keys.length, keys)
@@ -240,7 +238,7 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
 
   return keys
 
-  function startFeedReplication(feeds){
+  function startFeedReplication (feeds) {
     if (!Array.isArray(feeds)) feeds = [feeds]
 
     // Stop postponement of prefinalization.
@@ -248,8 +246,8 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
 
     // only the feeds passed to `feeds` option will be replicated (sent or received)
     // hypercore-protocol has built in protection against receiving unexpected/not asked for data.
-    feeds.forEach(function(feed) {
-      feed.ready(function() { // wait for each feed to be ready before replicating.
+    feeds.forEach(function (feed) {
+      feed.ready(function () { // wait for each feed to be ready before replicating.
         var hexKey = feed.key.toString('hex')
 
         // prevent a feed from being folded into the main stream twice.
@@ -270,11 +268,11 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
         // Store reference to this particular feed stream
         self._activeFeedStreams[hexKey] = fStream
 
-        var cleanup = function(err, res) {
+        var cleanup = function (_, res) {
           if (!self._activeFeedStreams[hexKey]) return
           // delete feed stream reference
           delete self._activeFeedStreams[hexKey]
-          debug(self._id, "[REPLICATION] feedStream closed:", hexKey.substr(0,8))
+          debug(self._id, '[REPLICATION] feedStream closed:', hexKey.substr(0, 8))
         }
         fStream.once('end', cleanup)
         fStream.once('error', cleanup)
@@ -303,18 +301,17 @@ function compatibleVersions (v1, v2) {
 
 function extractKeys (keys) {
   if (!Array.isArray(keys)) keys = [keys]
-  return keys.map(function(o) {
+  return keys.map(function (o) {
     if (typeof o === 'string') return o
     if (typeof o === 'object' && o.key) return o.key.toString('hex')
     if (o instanceof Buffer) return o.toString('utf8')
   })
-    .filter(function(o) { return !!o }) // remove invalid entries
+    .filter(function (o) { return !!o }) // remove invalid entries
 }
 
 function uniq (arr) {
-  return Object.keys(arr.reduce(function(m, i) {
-    m[i]=true
+  return Object.keys(arr.reduce(function (m, i) {
+    m[i] = true
     return m
   }, {})).sort()
 }
-
