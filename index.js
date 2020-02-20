@@ -214,6 +214,9 @@ Multifeed.prototype.writer = function (name, opts, cb) {
         var feed = keypair
           ? self._hypercore(storage, keypair.publicKey, Object.assign({}, self._opts, { secretKey: keypair.secretKey }))
           : self._hypercore(storage, self._opts)
+        feed.on('error', function (err) {
+          self.emit('error', err)
+        })
 
         feed.ready(function () {
           self._addFeed(feed, String(idx))
