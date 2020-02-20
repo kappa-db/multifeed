@@ -57,7 +57,7 @@ function Multifeed (storage, opts) {
       debug(self._id + ' Warning, running multifeed with unsecure default key')
     }
 
-    debug(self._id, 'Using encryption key:', encryptionKey.toString('hex'))
+    debug(self._id, 'Using encryption key:', encryptionKey.toString('hex').substring(0,5) + '..')
 
     var feed = hypercore(ram, encryptionKey)
 

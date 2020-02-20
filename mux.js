@@ -25,7 +25,7 @@ function Multiplexer (isInitiator, key, opts) {
   self._opts = opts = opts || {}
   this._id = opts._id || Math.floor(Math.random() * 10000).toString(16)
   this._initiator = isInitiator
-  debug(this._id + ' [REPLICATION] New mux initialized', key.toString('hex'), opts)
+  debug(this._id + ' [REPLICATION] New mux initialized', opts)
 
   // initialize
   self._localOffer = []
