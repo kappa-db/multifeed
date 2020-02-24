@@ -32,8 +32,8 @@ multi.writer('local', function (err, w) {
 })
 
 function replicate (a, b, cb) {
-  var r = a.replicate()
-  r.pipe(b.replicate()).pipe(r)
+  var r = a.replicate(true)
+  r.pipe(b.replicate(false)).pipe(r)
     .once('end', cb)
     .once('error', cb)
 }
