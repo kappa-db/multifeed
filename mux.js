@@ -127,7 +127,7 @@ function Multiplexer (isInitiator, key, opts) {
 
   this._replicateFeedsExt = stream.registerExtension(EXT_REPLICATE_FEEDS, {
     onmessage: function (msg) {
-      debug(self._id, 'RECV\'D Ext REQUEST_FEEDS:', msg)
+      debug(self._id, 'RECV\'D Ext REPLICATE_FEEDS:', msg)
       self._onRemoteReplicate(msg)
     },
     onerror: function (err) {
