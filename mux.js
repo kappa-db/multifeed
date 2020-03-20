@@ -287,7 +287,8 @@ Multiplexer.prototype._replicateFeeds = function (keys, cb) {
       })
     })
 
-    if (feeds.length === 0) {
+    // Bail on replication entirely if there were no feeds to add, and none are pending or active.
+    if (feeds.length === 0 && Object.keys(self._activeFeedStreams).length === 0) {
       debug('[REPLICATION] terminating mux: no feeds to sync')
       self._feed.close()
       process.nextTick(cb)
