@@ -6,7 +6,7 @@ var pump = require('pump')
 var through = require('through2')
 var debug = require('debug')('multifeed/protodump')
 
-test('Key exchange API', function(t){
+test('key exchange API', function(t){
   t.plan(6)
   var encryptionKey = Buffer.from('deadbeefdeadbeefdeadbeefdeadbeef') // used to encrypt the connection
 

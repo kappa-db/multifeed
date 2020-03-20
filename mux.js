@@ -257,10 +257,7 @@ Multiplexer.prototype._replicateFeeds = function (keys, cb) {
         var hexKey = feed.key.toString('hex')
 
         // prevent a feed from being folded into the main stream twice.
-        if (typeof self._activeFeedStreams[hexKey] !== 'undefined') {
-          debug(self._id, '[REPLICATION] warning! Prevented duplicate replication of: ', hexKey)
-          return
-        }
+        if (typeof self._activeFeedStreams[hexKey] !== 'undefined') return
 
         debug(self._id, '[REPLICATION] replicating feed:', hexKey)
         var fStream = feed.replicate(self._initiator, Object.assign({}, {
