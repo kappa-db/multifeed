@@ -117,7 +117,7 @@ function Multiplexer (isInitiator, key, opts) {
   this._requestFeedsExt = stream.registerExtension(EXT_REQUEST_FEEDS, {
     onmessage: function (msg) {
       debug(self._id, 'RECV\'D Ext REQUEST_FEEDS:', msg)
-      self._requestHandler(msg)
+      self._onRequestFeeds(msg)
     },
     onerror: function (err) {
       self._finalize(err)
@@ -191,7 +191,7 @@ Multiplexer.prototype.requestFeeds = function (keys) {
   this._requestFeedsExt.send(keys)
 }
 
-Multiplexer.prototype._requestHandler = function (keys) {
+Multiplexer.prototype._onRequestFeeds = function (keys) {
   var self = this
   var filtered = keys.filter(function (key) {
     if (self._localOffer.indexOf(key) === -1) {
