@@ -113,6 +113,12 @@ Ensure that `isInitiator` to `true` to one side, and `false` on the other. This 
 Works just like hypercore, except *all* local hypercores are exchanged between
 replication endpoints.
 
+### stream.on('remote-feeds', function () { ... })
+
+Emitted when a new batch (1 or more) of remote feeds have begun to replicate with this multifeed instance.
+
+This is useful for knowing when `multi.feeds()` contains the full set of feeds from the remote side.
+
 ### multi.on('feed', function (feed, name) { ... })
 
 Emitted whenever a new feed is added, whether locally or remotely.

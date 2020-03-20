@@ -218,12 +218,16 @@ Multiplexer.prototype._onRemoteReplicate = function (keys) {
   })
 
   // Start replicating as requested.
-  this._replicateFeeds(filtered)
+  this._replicateFeeds(filtered, function () {
+    self.stream.emit('remote-feeds')
+  })
 }
 
 // Initializes new replication streams for feeds and joins their streams into
 // the main stream.
-Multiplexer.prototype._replicateFeeds = function (keys) {
+Multiplexer.prototype._replicateFeeds = function (keys, cb) {
+  if (!cb) cb = noop
+
   var self = this
   keys = uniq(keys)
   debug(this._id, '[REPLICATION] _replicateFeeds', keys.length, keys)
@@ -240,6 +244,8 @@ Multiplexer.prototype._replicateFeeds = function (keys) {
 
   function startFeedReplication (feeds) {
     if (!Array.isArray(feeds)) feeds = [feeds]
+
+    var pending = feeds.length
 
     // Stop postponement of prefinalization.
     self.stream.prefinalize.continue()
@@ -276,12 +282,15 @@ Multiplexer.prototype._replicateFeeds = function (keys) {
         }
         fStream.once('end', cleanup)
         fStream.once('error', cleanup)
+
+        if (!--pending) cb()
       })
     })
 
     if (feeds.length === 0) {
       debug('[REPLICATION] terminating mux: no feeds to sync')
       self._feed.close()
+      process.nextTick(cb)
     }
   }
 }
@@ -315,3 +324,5 @@ function uniq (arr) {
     return m
   }, {})).sort()
 }
+
+function noop () {}

@@ -60,7 +60,7 @@ test('get localfeed by name', function (t) {
 })
 
 test('replicate two empty multifeeds', function (t) {
-  t.plan(2)
+  t.plan(3)
 
   var m1 = multifeed(ram, { valueEncoding: 'json' })
   var m2 = multifeed(ram, { valueEncoding: 'json' })
@@ -70,7 +70,10 @@ test('replicate two empty multifeeds', function (t) {
       var r = m1.replicate(true)
       r.pipe(m2.replicate(false)).pipe(r)
         .once('end', check)
+        .once('remote-feeds', function () {
+          t.ok(true, 'got "remote-feeds" event')
         })
+    })
   })
 
   function check () {
@@ -80,7 +83,7 @@ test('replicate two empty multifeeds', function (t) {
 })
 
 test('replicate two multifeeds', function (t) {
-  t.plan(22)
+  t.plan(26)
 
   var m1 = multifeed(ram, { valueEncoding: 'json' })
   var m2 = multifeed(ram, { valueEncoding: 'json' })
@@ -113,9 +116,18 @@ test('replicate two multifeeds', function (t) {
 
   setup(m1, 'foo', function () {
     setup(m2, 'bar', function () {
-      var r = m1.replicate(true)
-      r.pipe(m2.replicate(false)).pipe(r)
+      var r1 = m1.replicate(true)
+      var r2 = m2.replicate(false)
+      r1.pipe(r2).pipe(r1)
         .once('end', check)
+      r1.once('remote-feeds', function () {
+        t.ok(true, 'got r1 "remote-feeds" event')
+        t.equals(m1.feeds().length, 2, 'm1 feeds length is 2')
+      })
+      r2.once('remote-feeds', function () {
+        t.ok(true, 'got r2 "remote-feeds" event')
+        t.equals(m2.feeds().length, 2, 'm2 feeds length is 2')
+      })
     })
   })
 
