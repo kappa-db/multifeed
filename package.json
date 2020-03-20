@@ -20,6 +20,7 @@
     "hypercore-protocol": "^7.7.1",
     "inherits": "^2.0.3",
     "mutexify": "^1.2.0",
+    "once": "^1.4.0",
     "random-access-file": "^2.0.1",
     "random-access-memory": "^3.1.1",
     "through2": "^3.0.0"

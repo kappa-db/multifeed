@@ -3,6 +3,7 @@ var readify = require('./ready')
 var inherits = require('inherits')
 var events = require('events')
 var debug = require('debug')('multifeed')
+var once = require('once')
 
 // constants
 var MULTIFEED = 'MULTIFEED'
@@ -238,7 +239,7 @@ Multiplexer.prototype._replicateFeeds = function (keys, cb) {
   // for sync.
   this.stream.prefinalize.wait()
 
-  this.emit('replicate', keys, startFeedReplication)
+  this.emit('replicate', keys, once(startFeedReplication))
 
   return keys
 
