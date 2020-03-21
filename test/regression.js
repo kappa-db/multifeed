@@ -67,11 +67,6 @@ test('regression: MF with no writer replicate to MF with 1 writer', function (t)
         })
       })
     })
-    //cb()
-    //m.writer(function (err, w) {
-    //  t.error(err)
-    //  cb()
-    //})
   }
 
   setup1(m1, 'foo', function () {
