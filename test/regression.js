@@ -363,3 +363,53 @@ test('regression: ensure encryption key is not written to disk', function (t) {
     })
   })
 })
+
+test('replicate two multifeeds, twice', function (t) {
+  t.plan(20)
+
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
+
+  function setup (m, buf, cb) {
+    m.writer(function (err, w) {
+      t.error(err)
+      w.append(buf, function (err) {
+        t.error(err)
+        w.get(0, function (err, data) {
+          t.error(err)
+          t.equals(data, buf)
+          t.deepEquals(m.feeds(), [w])
+          cb()
+        })
+      })
+    })
+  }
+
+  setup(m1, 'foo', function () {
+    setup(m2, 'bar', function () {
+      sync(() => {
+        t.ok(true, 'first sync ok')
+        sync(() => {
+          t.ok(true, 'second sync ok')
+        })
+      })
+    })
+  })
+
+  function sync (cb) {
+    var pending = 2
+    var r1 = m1.replicate(true)
+    var r2 = m2.replicate(false)
+    r1.once('remote-feeds', function () {
+      t.ok(true, 'got r1 "remote-feeds" event')
+      t.equals(m1.feeds().length, 2, 'm1 feeds length is 2')
+      if (!--pending) cb()
+    })
+    r2.once('remote-feeds', function () {
+      t.ok(true, 'got r2 "remote-feeds" event')
+      t.equals(m2.feeds().length, 2, 'm2 feeds length is 2')
+      if (!--pending) cb()
+    })
+    r1.pipe(r2).pipe(r1)
+  }
+})
