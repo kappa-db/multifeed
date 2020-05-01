@@ -1,4 +1,5 @@
 var protocol = require('hypercore-protocol')
+var once = require('once')
 var readify = require('./ready')
 var inherits = require('inherits')
 var events = require('events')
@@ -38,6 +39,7 @@ function Multiplexer (key, opts) {
   self._requestedFeeds = []
   self._remoteOffer = []
   self._activeFeedStreams = {}
+  self._pendingReplicationFeeds = 2
 
   var stream = this.stream = protocol(Object.assign({},opts,{
     userData: Buffer.from(JSON.stringify({
@@ -209,16 +211,26 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
   // process of being set up for sync.
   this.stream.expectedFeeds++
 
-  this.emit('replicate', keys, startFeedReplication)
+  this.emit('replicate', keys, once(startFeedReplication))
 
   return keys
 
   function startFeedReplication(feeds){
+    if (!Array.isArray(feeds)) feeds = [feeds]
+
+    --self._pendingReplicationFeeds
+
     // Decrement back down the expected feeds.
     self.stream.expectedFeeds--
 
-    if (!Array.isArray(feeds)) feeds = [feeds]
     self.stream.expectedFeeds += feeds.length
+
+    if (self._pendingReplicationFeeds === 0 && self.stream.expectedFeeds === 0) {
+      debug(self._id, '[REPLICATION] terminating mux: no feeds to sync')
+      self.stream.expectedFeeds = 1
+      self._feed.close()
+      return
+    }
 
     // only the feeds passed to `feeds` option will be replicated (sent or received)
     // hypercore-protocol has built in protection against receiving unexpected/not asked for data.
@@ -256,11 +268,6 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
         fStream.once('error', cleanup)
       })
     })
-
-    if (feeds.length === 0) {
-      debug('[REPLICATION] terminating mux: no feeds to sync')
-      self._feed.close()
-    }
   }
 }
 
