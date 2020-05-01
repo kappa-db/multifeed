@@ -62,13 +62,13 @@ test('get localfeed by name', function (t) {
 test('replicate two empty multifeeds', function (t) {
   t.plan(2)
 
-  var m1 = multifeed(ram, { valueEncoding: 'json' })
-  var m2 = multifeed(ram, { valueEncoding: 'json' })
+  var m1 = multifeed(hypercore, ram, { valueEncoding: 'json' })
+  var m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })
 
   m1.ready(function () {
     m2.ready(function () {
-      var r = m1.replicate(true)
-      r.pipe(m2.replicate(false)).pipe(r)
+      var r = m1.replicate()
+      r.pipe(m2.replicate()).pipe(r)
         .once('end', check)
         })
   })
