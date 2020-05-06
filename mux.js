@@ -209,7 +209,7 @@ Multiplexer.prototype._onRequestFeeds = function (keys) {
   this._replicateFeedsExt.send(filtered)
 
   // Start replicating as promised.
-  this._replicateFeeds(filtered)
+  this._replicateFeeds(filtered, false)
 }
 
 Multiplexer.prototype._onRemoteReplicate = function (keys) {
@@ -219,14 +219,14 @@ Multiplexer.prototype._onRemoteReplicate = function (keys) {
   })
 
   // Start replicating as requested.
-  this._replicateFeeds(filtered, function () {
+  this._replicateFeeds(filtered, true, function () {
     self.stream.emit('remote-feeds')
   })
 }
 
 // Initializes new replication streams for feeds and joins their streams into
 // the main stream.
-Multiplexer.prototype._replicateFeeds = function (keys, cb) {
+Multiplexer.prototype._replicateFeeds = function (keys, terminateIfNoFeeds, cb) {
   if (!cb) cb = noop
 
   var self = this
@@ -289,9 +289,11 @@ Multiplexer.prototype._replicateFeeds = function (keys, cb) {
     })
 
     // Bail on replication entirely if there were no feeds to add, and none are pending or active.
-    if (feeds.length === 0 && Object.keys(self._activeFeedStreams).length === 0) {
-      debug('[REPLICATION] terminating mux: no feeds to sync')
+    if (feeds.length === 0 && Object.keys(self._activeFeedStreams).length === 0 && terminateIfNoFeeds) {
+      debug(self._id, '[REPLICATION] terminating mux: no feeds to sync')
       self._feed.close()
+      process.nextTick(cb)
+    } else if (feeds.length === 0) {
       process.nextTick(cb)
     }
   }

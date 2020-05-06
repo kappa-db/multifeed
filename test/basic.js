@@ -59,6 +59,29 @@ test('get localfeed by name', function (t) {
   })
 })
 
+test('replicate two multifeeds, one empty', function (t) {
+  t.plan(3)
+
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
+
+  m1.writer(function () {
+    m2.ready(function () {
+      var r = m1.replicate(true)
+      r.pipe(m2.replicate(false)).pipe(r)
+        .once('end', check)
+        .once('remote-feeds', function () {
+          t.ok(true, 'got "remote-feeds" event')
+        })
+    })
+  })
+
+  function check () {
+    t.equals(m1.feeds().length, 1)
+    t.equals(m2.feeds().length, 1)
+  }
+})
+
 test('replicate two empty multifeeds', function (t) {
   t.plan(3)
 
