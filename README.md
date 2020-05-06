@@ -68,7 +68,11 @@ var multifeed = require('multifeed')
 
 ### var multi = multifeed(storage[, opts])
 
-Pass in a [random-access-storage](https://github.com/random-access-storage/random-access-storage) backend, and options. Included `opts` are passed into new hypercores created, and are the same as [hypercore](https://github.com/mafintosh/hypercore#var-feed--hypercorestorage-key-options)'s.
+Create a multifeed.
+
+`storage` is a [random-access-storage](https://github.com/random-access-storage) function, or a string. If a string is given, [random-access-file](https://github.com/random-access-storage/random-access-storage) is used with that string as the filename.
+
+Included `opts` are passed into new hypercores created, and are the same as [hypercore](https://github.com/mafintosh/hypercore#var-feed--hypercorestorage-key-options)'s.
 
 Valid `opts` include:
 - `opts.encryptionKey` (string): optional encryption key to use during replication. If not provided, a default insecure key will be used.
