@@ -4,6 +4,7 @@ var inherits = require('inherits')
 var events = require('events')
 var debug = require('debug')('multifeed')
 var once = require('once')
+var AbstractExtension = require('abstract-extension')
 
 // constants
 var MULTIFEED = 'MULTIFEED'
@@ -18,6 +19,14 @@ var EXT_REPLICATE_FEEDS = 'MULTIFEED_REPLICATE_FEEDS'
 // errors
 var ERR_VERSION_MISMATCH = 'ERR_VERSION_MISMATCH'
 var ERR_CLIENT_MISMATCH = 'ERR_CLIENT_MISMATCH'
+
+var DEFAULT_TIMEOUT = 10000
+
+class Extension extends AbstractExtension {
+  send (message) {
+    this.local.handlers.send(this.id, this.encode(message))
+  }
+}
 
 // `key` - protocol encryption key
 function Multiplexer (isInitiator, key, opts) {
@@ -34,25 +43,123 @@ function Multiplexer (isInitiator, key, opts) {
   self._remoteOffer = []
   self._activeFeedStreams = {}
 
-  var onFirstKey = true
-  var stream = this.stream = new Protocol(isInitiator, Object.assign({}, opts, {
-    ondiscoverykey: function (key) {
-      if (onFirstKey) {
-        onFirstKey = false
-        if (!self.stream.remoteVerified(key)) {
-          self._finalize(new Error('Exchange key did not match remote'))
-        }
-      }
-    }
-  }))
+  if (opts.stream) {
+    self.stream = opts.stream
+  } else {
+    self.stream = new Protocol(isInitiator, Object.assign({}, opts))
+  }
 
-  this._handshakeExt = this.stream.registerExtension(EXT_HANDSHAKE, {
+  // Prepare the extension handlers.
+  self._extensions = Extension.createLocal({
+    send (id, message) {
+      self._channel.extension(id, message)
+    }
+  })
+  self._remoteExtensions = self._extensions.remote()
+
+  // Open a protocol channel on the shared key.
+  self._channel = self.stream.open(key, {
+    onopen: function () {
+      if (!self.stream.remoteVerified(key)) {
+        debug(self._id + ' [REPLICATION] aborting; shared key mismatch')
+        self._finalize(new Error('shared key mismatch!'))
+        return
+      }
+
+      self._registerExtensions()
+
+      // send handshake
+      self._handshakeExt.send(Object.assign({}, {
+        client: MULTIFEED,
+        version: PROTOCOL_VERSION,
+        userData: opts.userData
+      }))
+    },
+    onextension (id, message) {
+      self._remoteExtensions.onmessage(id, message, self._channel)
+    },
+    onoptions (options) {
+      self._remoteExtensions.update(options.extensions)
+    }
+  })
+
+  if (!self._opts.live) {
+    self.stream.on('prefinalize', function () {
+      self._channel.close()
+      debug(self._id + ' [REPLICATION] feed finish/prefinalize (' + self.stream.prefinalize._tick + ')')
+    })
+  }
+
+  // The timeout will occur if the remote does not open a channel for
+  // the shared key.
+  if (opts.timeout !== false) {
+    this.timeout = setTimeout(() => {
+      this._finalize(new Error('Multifeed handshake remote timeout'))
+    }, opts.timeout || DEFAULT_TIMEOUT)
+  }
+
+  this._ready = readify(function (done) {
+    self.on('ready', function (remote) {
+      if (this.timeout) clearTimeout(this.timeout)
+      debug(self._id + ' [REPLICATION] remote connected and ready')
+      done(remote)
+    })
+  })
+}
+
+inherits(Multiplexer, events.EventEmitter)
+
+Multiplexer.prototype.ready = function (cb) {
+  this._ready(cb)
+}
+
+Multiplexer.prototype._registerExtensions = function () {
+  var self = this
+
+  self._handshakeExt = self._extensions.add(EXT_HANDSHAKE, {
     onmessage: onHandshake,
     onerror: function (err) {
       self._finalize(err)
     },
     encoding: 'json'
   })
+
+  self._manifestExt = self._extensions.add(EXT_MANIFEST, {
+    onmessage: function (msg) {
+      debug(self._id, 'RECV\'D Ext MANIFEST:', JSON.stringify(msg))
+      self._remoteOffer = uniq(self._remoteOffer.concat(msg.keys))
+      self.emit('manifest', msg, self.requestFeeds.bind(self))
+    },
+    onerror: function (err) {
+      self._finalize(err)
+    },
+    encoding: 'json'
+  })
+
+  self._requestFeedsExt = self._extensions.add(EXT_REQUEST_FEEDS, {
+    onmessage: function (msg) {
+      debug(self._id, 'RECV\'D Ext REQUEST_FEEDS:', msg)
+      self._onRequestFeeds(msg)
+    },
+    onerror: function (err) {
+      self._finalize(err)
+    },
+    encoding: 'json'
+  })
+
+  self._replicateFeedsExt = self._extensions.add(EXT_REPLICATE_FEEDS, {
+    onmessage: function (msg) {
+      debug(self._id, 'RECV\'D Ext REPLICATE_FEEDS:', msg)
+      self._onRemoteReplicate(msg)
+    },
+    onerror: function (err) {
+      self._finalize(err)
+    },
+    encoding: 'json'
+  })
+
+  // Send the extension names to our remote peer.
+  self._channel.options({ extensions: self._extensions.names() })
 
   function onHandshake (header) {
     debug(self._id + ' [REPLICATION] recv\'d handshake: ', JSON.stringify(header))
@@ -83,79 +190,6 @@ function Multiplexer (isInitiator, key, opts) {
       self.emit('ready', header)
     })
   }
-
-  // Open a virtual feed that has the key set to the shared key.
-  this._feed = stream.open(key, {
-    onopen: function () {
-      onFirstKey = false
-      if (!stream.remoteVerified(key)) {
-        debug(self._id + ' [REPLICATION] aborting; shared key mismatch')
-        self._finalize(new Error('shared key version mismatch!'))
-        return
-      }
-
-      // send handshake
-      self._handshakeExt.send(Object.assign({}, opts, {
-        client: MULTIFEED,
-        version: PROTOCOL_VERSION,
-        userData: opts.userData
-      }))
-    }
-  })
-
-  this._manifestExt = stream.registerExtension(EXT_MANIFEST, {
-    onmessage: function (msg) {
-      debug(self._id, 'RECV\'D Ext MANIFEST:', JSON.stringify(msg))
-      self._remoteOffer = uniq(self._remoteOffer.concat(msg.keys))
-      self.emit('manifest', msg, self.requestFeeds.bind(self))
-    },
-    onerror: function (err) {
-      self._finalize(err)
-    },
-    encoding: 'json'
-  })
-
-  this._requestFeedsExt = stream.registerExtension(EXT_REQUEST_FEEDS, {
-    onmessage: function (msg) {
-      debug(self._id, 'RECV\'D Ext REQUEST_FEEDS:', msg)
-      self._onRequestFeeds(msg)
-    },
-    onerror: function (err) {
-      self._finalize(err)
-    },
-    encoding: 'json'
-  })
-
-  this._replicateFeedsExt = stream.registerExtension(EXT_REPLICATE_FEEDS, {
-    onmessage: function (msg) {
-      debug(self._id, 'RECV\'D Ext REPLICATE_FEEDS:', msg)
-      self._onRemoteReplicate(msg)
-    },
-    onerror: function (err) {
-      self._finalize(err)
-    },
-    encoding: 'json'
-  })
-
-  if (!self._opts.live) {
-    self.stream.on('prefinalize', function () {
-      self._feed.close()
-      debug(self._id + ' [REPLICATION] feed finish/prefinalize (' + self.stream.prefinalize._tick + ')')
-    })
-  }
-
-  this._ready = readify(function (done) {
-    self.on('ready', function (remote) {
-      debug(self._id + ' [REPLICATION] remote connected and ready')
-      done(remote)
-    })
-  })
-}
-
-inherits(Multiplexer, events.EventEmitter)
-
-Multiplexer.prototype.ready = function (cb) {
-  this._ready(cb)
 }
 
 Multiplexer.prototype._finalize = function (err) {
@@ -291,7 +325,7 @@ Multiplexer.prototype._replicateFeeds = function (keys, cb) {
     // Bail on replication entirely if there were no feeds to add, and none are pending or active.
     if (feeds.length === 0 && Object.keys(self._activeFeedStreams).length === 0) {
       debug('[REPLICATION] terminating mux: no feeds to sync')
-      self._feed.close()
+      self._channel.close()
       process.nextTick(cb)
     }
   }

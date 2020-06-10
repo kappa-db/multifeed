@@ -15,6 +15,7 @@
   },
   "keywords": [],
   "dependencies": {
+    "abstract-extension": "^3.1.0",
     "debug": "^4.1.0",
     "hypercore": "^8.3.0",
     "hypercore-protocol": "^7.7.1",
@@ -26,13 +27,16 @@
     "through2": "^3.0.0"
   },
   "devDependencies": {
+    "@hyperswarm/dht": "^3.6.5",
+    "corestore": "^5.3.2",
+    "corestore-swarm-networking": "^5.4.3",
     "hypercore-crypto": "^1.0.0",
     "pump": "^3.0.0",
     "pumpify": "^1.5.1",
     "random-access-latency": "^1.0.0",
     "rimraf": "^2.6.3",
     "standard": "~10.0.0",
-    "tape": "~4.6.2",
+    "tape": "^5",
     "tmp": "0.0.33"
   },
   "license": "ISC"

@@ -251,7 +251,7 @@ test('regression: MFs with different root keys cannot replicate', function (t) {
       var r = m1.replicate(true)
       var s = m2.replicate(false)
       pump(r, s, r, function (err) {
-        t.same(err.toString(), 'Error: Exchange key did not match remote')
+        t.same(err.toString(), 'Error: Multifeed handshake remote timeout')
         t.end()
       })
     })
