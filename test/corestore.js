@@ -16,9 +16,12 @@ const KEY_A = Buffer.alloc(32, 1)
 const KEY_B = Buffer.alloc(32, 2)
 
 test('corestore networker example', async function (t) {
+  // Create two distinct corestores and networkers.
+  // They will communicate over a localhost DHT.
   const { store: store1, networker: networker1 } = await create()
   const { store: store2, networker: networker2 } = await create()
 
+  // Init some cores.
   const core1 = store1.get()
   const core2a = store2.get()
   const core2b = store2.get()
@@ -27,28 +30,36 @@ test('corestore networker example', async function (t) {
   const data = await get(core1, 0)
   t.same(data, Buffer.from('hello'))
 
+  // For each networker, setup the mulitfeed mux wrapper.
   const muxer1 = new Muxer(networker1)
   const muxer2 = new Muxer(networker2)
 
+  // For each mux wrapper, join on two different multifeed rootkeys.
   const mux1a = muxer1.join(KEY_A, { name: 'm1a' })
   const mux1b = muxer1.join(KEY_B, { name: 'm1b' })
 
   const mux2a = muxer2.join(KEY_A, { name: 'mux2a' })
   const mux2b = muxer2.join(KEY_B, { name: 'mux2b' })
 
+  // Person 1 adds the same feed to both multifeeds.
   mux1a.addFeed(core1.key)
   mux1b.addFeed(core1.key)
 
+  // Person2 adds two different feeds to each multifeed.
   mux2a.addFeed(core2a.key)
   mux2b.addFeed(core2b.key)
 
+  // Wait for things to sync.
   // TODO: Remove timeout, wait for event instead.
   await timeout(500)
 
+  // Check that the muxers for the same keys arrived at the same set of feeds.
   t.deepEqual(toKeys(mux1a.feeds()), toKeys([core1, core2a]))
   t.deepEqual(toKeys(mux2a.feeds()), toKeys([core1, core2a]))
   t.deepEqual(toKeys(mux1b.feeds()), toKeys([core1, core2b]))
   t.deepEqual(toKeys(mux2b.feeds()), toKeys([core1, core2b]))
+
+  // Check that the cores actually replicated.
   let checked = false
   for (const feed of mux2b.feeds()) {
     if (feed.key.toString('hex') === core1.key.toString('hex')) {
@@ -58,6 +69,8 @@ test('corestore networker example', async function (t) {
     }
   }
   if (!checked) t.fail('missing data check')
+
+  // Cleanup.
   await cleanup([networker1, networker2])
   t.end()
 })
