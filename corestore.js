@@ -1,5 +1,6 @@
 const crypto = require('hypercore-crypto')
 const Multiplexer = require('./mux')
+const debug = require('debug')('multifeed')
 const { EventEmitter } = require('events')
 
 class CorestoreMuxerTopic extends EventEmitter {
@@ -68,10 +69,12 @@ class CorestoreMuxerTopic extends EventEmitter {
     const hkey = feed.key.toString('hex')
     this._feeds.set(hkey, feed)
     for (const { mux } of this.streams.values()) {
-      if (mux.knownFeeds().indexOf(hkey) === -1) {
-        // debug('Forwarding new feed to existing peer:', hexKey)
-        mux.offerFeeds([hkey])
-      }
+      mux.ready(() => {
+        if (mux.knownFeeds().indexOf(hkey) === -1) {
+          debug('Forwarding new feed to existing peer:', hkey)
+          mux.offerFeeds([hkey])
+        }
+      })
     }
   }
 }
@@ -81,6 +84,7 @@ module.exports = class CorestoreMuxer {
     this.networker = networker
     this.corestore = networker.corestore
     this.muxers = new Map()
+    this.streamsByKey = new Map()
 
     this._joinListener = this._onjoin.bind(this)
     this._leaveListener = this._onleave.bind(this)
@@ -89,12 +93,16 @@ module.exports = class CorestoreMuxer {
   }
 
   _onjoin (stream, info) {
+    const remoteKey = stream.remotePublicKey
+    const keyString = remoteKey.toString('hex')
+    this.streamsByKey.set(keyString, { stream, info })
     for (const mux of this.muxers.values()) {
       mux.addStream(stream, info)
     }
   }
 
   _onleave (stream, info, finishedHandshake) {
+    if (!finishedHandshake || (info && info.duplicate)) return
     for (const mux of this.muxers.values()) {
       mux.removeStream(stream)
     }
@@ -109,6 +117,9 @@ module.exports = class CorestoreMuxer {
     const mux = new CorestoreMuxerTopic(this.corestore, rootKey, opts)
     this.networker.join(discoveryKey)
     this.muxers.set(hkey, mux)
+    for (const { stream, info } of this.streamsByKey.values()) {
+      mux.addStream(stream, info)
+    }
     return mux
   }
 }
