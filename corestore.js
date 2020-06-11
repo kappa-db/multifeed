@@ -29,7 +29,7 @@ class CorestoreMuxerTopic extends EventEmitter {
 
     function onready () {
       const keys = Array.from(self._feeds.keys())
-      if (keys.length) mux.offerFeeds(keys)
+      mux.offerFeeds(keys)
     }
 
     function onmanifest (manifest) {
