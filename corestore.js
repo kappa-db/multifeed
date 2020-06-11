@@ -10,14 +10,14 @@ class CorestoreMuxerTopic extends EventEmitter {
     this.rootKey = rootKey
     this._feeds = new Map()
     this.streams = new Map()
+    this.opts = opts
   }
 
-  addStream (stream, info) {
+  addStream (stream, opts) {
     const self = this
-    const isInitiator = !!info.client
-    const opts = { stream, live: true }
+    opts = { ...this.opts, ...opts, stream }
 
-    const mux = new Multiplexer(isInitiator, this.rootKey, opts)
+    const mux = new Multiplexer(null, this.rootKey, opts)
 
     mux.on('manifest', onmanifest)
     mux.on('replicate', onreplicate)
@@ -97,7 +97,7 @@ module.exports = class CorestoreMuxer {
     const keyString = remoteKey.toString('hex')
     this.streamsByKey.set(keyString, { stream, info })
     for (const mux of this.muxers.values()) {
-      mux.addStream(stream, info)
+      mux.addStream(stream, this.opts)
     }
   }
 
@@ -117,9 +117,11 @@ module.exports = class CorestoreMuxer {
     const mux = new CorestoreMuxerTopic(this.corestore, rootKey, opts)
     this.networker.join(discoveryKey)
     this.muxers.set(hkey, mux)
-    for (const { stream, info } of this.streamsByKey.values()) {
-      mux.addStream(stream, info)
+    for (const { stream } of this.streamsByKey.values()) {
+      mux.addStream(stream)
     }
     return mux
   }
 }
+
+module.exports.CorestoreMuxerTopic = CorestoreMuxerTopic

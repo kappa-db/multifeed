@@ -35,11 +35,11 @@ test('corestore networker example', async function (t) {
   const muxer2 = new Muxer(networker2)
 
   // For each mux wrapper, join on two different multifeed rootkeys.
-  const mux1a = muxer1.join(KEY_A, { name: 'm1a' })
-  const mux1b = muxer1.join(KEY_B, { name: 'm1b' })
+  const mux1a = muxer1.join(KEY_A, { live: true, name: 'm1a' })
+  const mux1b = muxer1.join(KEY_B, { live: true, name: 'm1b' })
 
-  const mux2a = muxer2.join(KEY_A, { name: 'mux2a' })
-  const mux2b = muxer2.join(KEY_B, { name: 'mux2b' })
+  const mux2a = muxer2.join(KEY_A, { live: true, name: 'mux2a' })
+  const mux2b = muxer2.join(KEY_B, { live: true, name: 'mux2b' })
 
   // Person 1 adds the same feed to both multifeeds.
   mux1a.addFeed(core1.key)
