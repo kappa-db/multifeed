@@ -294,6 +294,9 @@ Multifeed.prototype.replicate = function (isInitiator, opts) {
     var cleanup = function (err) {
       mux.removeListener('manifest', onManifest)
       mux.removeListener('replicate', onReplicate)
+      mux.stream.removeListener('end', cleanup)
+      mux.stream.removeListener('error', cleanup)
+      mux.stream.finalize()
       self._streams.splice(self._streams.indexOf(mux), 1)
       debug('[REPLICATION] Client connection destroyed', err)
     }

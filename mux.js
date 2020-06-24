@@ -138,14 +138,16 @@ function Multiplexer (isInitiator, key, opts) {
   })
 
   if (!self._opts.live) {
-    self.stream.on('prefinalize', function () {
+    self.stream.on('prefinalize', onPrefinalize)
+    function onPrefinalize () {
+      self.stream.removeListener('prefinalize', onPrefinalize)
       self._feed.close()
       debug(self._id + ' [REPLICATION] feed finish/prefinalize (' + self.stream.prefinalize._tick + ')')
-    })
+    }
   }
 
   this._ready = readify(function (done) {
-    self.on('ready', function (remote) {
+    self.once('ready', function (remote) {
       debug(self._id + ' [REPLICATION] remote connected and ready')
       done(remote)
     })
@@ -276,6 +278,8 @@ Multiplexer.prototype._replicateFeeds = function (keys, terminateIfNoFeeds, cb) 
         self._activeFeedStreams[hexKey] = fStream
 
         var cleanup = function (_, res) {
+          fStream.removeListener('end', cleanup)
+          fStream.removeListener('error', cleanup)
           if (!self._activeFeedStreams[hexKey]) return
           // delete feed stream reference
           delete self._activeFeedStreams[hexKey]
