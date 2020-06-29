@@ -6,7 +6,7 @@ const Corestore = require('corestore')
 const dht = require('@hyperswarm/dht')
 const SwarmNetworker = require('corestore-swarm-networking')
 
-const Muxer = require('../corestore')
+const Muxer = require('./lib/corestore')
 const multifeed = require('..')
 
 const BOOTSTRAP_PORT = 3100

@@ -1,5 +1,5 @@
 const crypto = require('hypercore-crypto')
-const Multiplexer = require('./mux')
+const Multiplexer = require('../../mux')
 const debug = require('debug')('multifeed')
 const { EventEmitter } = require('events')
 
