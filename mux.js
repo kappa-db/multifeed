@@ -35,16 +35,22 @@ function Multiplexer (isInitiator, key, opts) {
   self._activeFeedStreams = {}
 
   var onFirstKey = true
-  var stream = this.stream = new Protocol(isInitiator, Object.assign({}, opts, {
-    ondiscoverykey: function (key) {
-      if (onFirstKey) {
-        onFirstKey = false
-        if (!self.stream.remoteVerified(key)) {
-          self._finalize(new Error('Exchange key did not match remote'))
-        }
+  if (Protocol.isProtocolStream(isInitiator)) {
+    var stream = this.stream = isInitiator
+    stream.on('discovery-key', ondiscoverykey)
+  } else {
+    var stream = this.stream = new Protocol(isInitiator, Object.assign({}, opts, {
+      ondiscoverykey
+    }))
+  }
+  function ondiscoverykey (key) {
+    if (onFirstKey) {
+      onFirstKey = false
+      if (!self.stream.remoteVerified(key)) {
+        self._finalize(new Error('Exchange key did not match remote'))
       }
     }
-  }))
+  }
 
   this._handshakeExt = this.stream.registerExtension(EXT_HANDSHAKE, {
     onmessage: onHandshake,
