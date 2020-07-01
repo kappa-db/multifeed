@@ -195,12 +195,15 @@ Multiplexer.prototype._onRemoteReplicate = function (keys) {
   })
 
   // Start replicating as requested.
-  this._replicateFeeds(filtered)
+  this._replicateFeeds(filtered, true, function () {
+    self.stream.emit('remote-feeds')
+  })
 }
 
 // Initializes new replication streams for feeds and joins their streams into
 // the main stream.
-Multiplexer.prototype._replicateFeeds = function(keys) {
+Multiplexer.prototype._replicateFeeds = function(keys, terminateIfNoFeeds, cb) {
+  if (!cb) cb = () => {}
   var self = this
   keys = uniq(keys)
   debug(this._id, '[REPLICATION] _replicateFeeds', keys.length, keys)
@@ -218,6 +221,8 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
   function startFeedReplication(feeds){
     if (!Array.isArray(feeds)) feeds = [feeds]
 
+    var pending = feeds.length
+
     --self._pendingReplicationFeeds
 
     // Decrement back down the expected feeds.
@@ -229,6 +234,7 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
       debug(self._id, '[REPLICATION] terminating mux: no feeds to sync')
       self.stream.expectedFeeds = 1
       self._feed.close()
+      process.nextTick(cb)
       return
     }
 
@@ -243,6 +249,7 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
           debug(self._id, '[REPLICATION] warning! Prevented duplicate replication of: ', hexKey)
           // decrease the expectedFeeds that was unconditionally increased
           self.stream.expectedFeeds--
+          if (!--pending) cb()
           return
         }
 
@@ -266,6 +273,8 @@ Multiplexer.prototype._replicateFeeds = function(keys) {
         }
         fStream.once('end', cleanup)
         fStream.once('error', cleanup)
+
+        if (!--pending) cb()
       })
     })
   }

@@ -82,7 +82,7 @@ test('replicate two empty multifeeds', function (t) {
 })
 
 test('replicate two multifeeds', function (t) {
-  t.plan(22)
+  t.plan(23)
 
   var m1 = multifeed(hypercore, ram, { valueEncoding: 'json' })
   var m2 = multifeed(hypercore, ram, { valueEncoding: 'json' })
@@ -118,6 +118,9 @@ test('replicate two multifeeds', function (t) {
       var r = m1.replicate()
       r.pipe(m2.replicate()).pipe(r)
         .once('end', check)
+        .once('remote-feeds', function () {
+          t.ok(true, 'got "remote-feeds" event')
+        })
     })
   })
 
