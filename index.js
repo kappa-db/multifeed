@@ -118,6 +118,9 @@ function _close (cb) {
         self._feeds = []
         self._feedKeyToFeed = {}
         self._root = undefined
+        self._streams.forEach((mux) => {
+          mux._finalize()
+        })
         return done()
       }
       feeds[n].close(function (err) {
