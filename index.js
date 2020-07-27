@@ -116,6 +116,7 @@ function _close (cb) {
     function next (n) {
       if (n >= feeds.length) {
         self._feeds = []
+        self._feedKeyToFeed = {}
         self._root = undefined
         return done()
       }
