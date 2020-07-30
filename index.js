@@ -116,7 +116,11 @@ function _close (cb) {
     function next (n) {
       if (n >= feeds.length) {
         self._feeds = []
+        self._feedKeyToFeed = {}
         self._root = undefined
+        self._streams.forEach((mux) => {
+          mux._finalize()
+        })
         return done()
       }
       feeds[n].close(function (err) {
@@ -295,12 +299,14 @@ Multifeed.prototype.replicate = function (isInitiator, opts) {
       mux.removeListener('manifest', onManifest)
       mux.removeListener('replicate', onReplicate)
       mux.stream.removeListener('end', cleanup)
+      mux.stream.removeListener('close', cleanup)
       mux.stream.removeListener('error', cleanup)
       mux.stream.finalize()
       self._streams.splice(self._streams.indexOf(mux), 1)
       debug('[REPLICATION] Client connection destroyed', err)
     }
     mux.stream.once('end', cleanup)
+    mux.stream.once('close', cleanup)
     mux.stream.once('error', cleanup)
   })
 
