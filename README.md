@@ -84,8 +84,8 @@ If no `name` is given, a new local writeable feed is created and returned via
 `cb`.
 
 If `name` is given and was created in the past on this local machine, it is
-returned. Otherwise it is created. This is useful for managing multiple local
-feeds, e.g.
+returned. Otherwise it is created. These names are purely local & are not
+synced over the network. This is useful for managing multiple local feeds, e.g.
 
 ```js
 var main = multi.writer('main')        // created if doesn't exist
