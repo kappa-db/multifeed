@@ -35,21 +35,23 @@ function Multiplexer (isInitiator, key, opts) {
   self._activeFeedStreams = {}
 
   var onFirstKey = true
-  if (Protocol.isProtocolStream(isInitiator)) {
-    var stream = this.stream = isInitiator
-    stream.on('discovery-key', ondiscoverykey)
-  } else {
-    var stream = this.stream = new Protocol(isInitiator, Object.assign({}, opts, {
-      ondiscoverykey
-    }))
-  }
-  function ondiscoverykey (key) {
+
+  self._ondiscoverykey = function (key) {
     if (onFirstKey) {
       onFirstKey = false
-      if (!self.stream.remoteVerified(key)) {
-        self._finalize(new Error('Exchange key did not match remote'))
+      if (!this.stream.remoteVerified(key)) {
+        this._finalize(new Error('Exchange key did not match remote'))
       }
     }
+  }.bind(self)
+
+  if (Protocol.isProtocolStream(isInitiator)) {
+    var stream = this.stream = isInitiator
+    stream.on('discovery-key', self._ondiscoverykey)
+  } else {
+    var stream = this.stream = new Protocol(isInitiator, Object.assign({}, opts, {
+      ondiscoverykey: self._ondiscoverykey
+    }))
   }
 
   this._handshakeExt = this.stream.registerExtension(EXT_HANDSHAKE, {
@@ -175,6 +177,7 @@ Multiplexer.prototype._finalize = function (err) {
     debug(this._id + ' [REPLICATION] finalized', err)
     this.stream.finalize()
   }
+  this.stream.removeListener('discovery-key', this._ondiscoverykey)
 }
 
 // Calls to this method results in the creation of a 'manifest'
