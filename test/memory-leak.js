@@ -1,7 +1,7 @@
 var test = require('tape')
 var multifeed = require('..')
 var ram = require('random-access-memory')
-var parallel = require('run-parallel')
+var series = require('async-series')
 
 test('so many feeds', function (t) {
   function createMultifeed (cb) {
@@ -19,34 +19,49 @@ test('so many feeds', function (t) {
     }
   }
 
-  var total = 500
+  var total = 20
   var tasks = []
+  var feeds = []
 
   for (var i = 0; i < total; i++) {
-    tasks.push((done) => {
-      createMultifeed((err, m) => {
-        if (err) return done(err)
-        done(null, m)
+    ;(function (n) {
+      tasks.push((done) => {
+        // console.log('making', n)
+        createMultifeed((err, m) => {
+          if (err) return done(err)
+          // console.log('made', n)
+          feeds.push(m)
+          m.n = n
+          done(null, m)
+        })
       })
-    })
+    })(i)
   }
 
-  parallel(tasks, (err, feeds) => {
+  series(tasks, (err) => {
     if (err) throw err
-    console.log(feeds.length, 'feeds')
+    console.log('created', feeds.length, 'feeds')
     console.log('ready!')
     var replications = []
 
     feeds.sort((a, b) => {
       if (a && b) {
-        replications.push((done) => replicate(a, b, done))
+        replications.push((done) => {
+          // console.log('syncing', a.n, 'and', b.n)
+          replicate(a, b, err => {
+            // console.log('SYNCED', a.n, 'and', b.n)
+            done(err)
+          })
+        })
       }
       return -1
     })
 
-    parallel(replications, (err) => {
+    console.log('pre-sync heap', process.memoryUsage().heapUsed / 1000000, 'mb')
+    series(replications, (err) => {
       if (err) throw err
       console.log('replicated! everything!')
+      console.log('post-sync heap', process.memoryUsage().heapUsed / 1000000, 'mb')
       t.end()
     })
   })
@@ -55,8 +70,5 @@ test('so many feeds', function (t) {
     var r = m1.replicate(true)
     r.pipe(m2.replicate(false)).pipe(r)
       .once('end', cb)
-      .once('remote-feeds', (feeds) => {
-        console.log('got remote feeds')
-      })
   }
 })
