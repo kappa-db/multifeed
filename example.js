@@ -8,7 +8,7 @@ console.log(multi.feeds().length)             // => 0
 
 // create as many writeable feeds as you want; returns hypercores
 multi.writer('local', function (err, w) {
-  console.log(w.key, w.writeable, w.readable)   // => Buffer <0x..> true true
+  console.log(w.key, w.writable, w.readable)   // => Buffer <0x..> true true
   console.log(multi.feeds().length)             // => 1
 
   // write data to any writeable feed, just like with hypercore
