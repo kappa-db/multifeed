@@ -16,8 +16,8 @@
   "keywords": [],
   "dependencies": {
     "debug": "^4.1.0",
-    "hypercore": "^8.3.0",
-    "hypercore-protocol": "^7.7.1",
+    "hypercore": "^9.6.0",
+    "hypercore-protocol": "^8.0.7",
     "inherits": "^2.0.3",
     "mutexify": "^1.2.0",
     "once": "^1.4.0",
