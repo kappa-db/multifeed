@@ -2,7 +2,7 @@
   "name": "multifeed",
   "description": "multi-writer hypercore",
   "author": "Stephen Whitmore <sww@eight.net>",
-  "version": "5.2.4",
+  "version": "6.0.0",
   "repository": {
     "url": "git://github.com/noffle/multifeed.git"
   },
