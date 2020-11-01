@@ -37,6 +37,10 @@ function Multifeed (storage, opts) {
   this._close = readyify(_close.bind(this), true)
   this.closed = false
 
+  this._onFeedError = function (err) {
+    this.emit('error', err)
+  }.bind(this)
+
   // random-access-storage wrapper that wraps all hypercores in a directory
   // structures. (dir/0, dir/1, ...)
   this._storage = function (dir) {
@@ -61,9 +65,8 @@ function Multifeed (storage, opts) {
 
     var feed = hypercore(ram, encryptionKey)
 
-    feed.on('error', function (err) {
-      self.emit('error', err)
-    })
+    feed.on('error', self._onFeedError)
+    feed.on('close', () => feed.removeListener('error', self._onFeedError))
 
     feed.ready(function () {
       self._root = feed
@@ -218,9 +221,9 @@ Multifeed.prototype.writer = function (name, opts, cb) {
         var feed = keypair
           ? self._hypercore(storage, keypair.publicKey, Object.assign({}, self._opts, { secretKey: keypair.secretKey }))
           : self._hypercore(storage, self._opts)
-        feed.on('error', function (err) {
-          self.emit('error', err)
-        })
+
+        feed.on('error', self._onFeedError)
+        feed.on('close', () => feed.removeListener('error', self._onFeedError))
 
         feed.ready(function () {
           self._addFeed(feed, String(idx))
