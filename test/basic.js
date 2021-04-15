@@ -291,6 +291,112 @@ test('close after double-open', function (t) {
   }
 })
 
+test('remove feed w/ name', function (t) {
+  t.plan(6)
+
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
+
+  m1.writer(function (err) {
+    t.error(err)
+    m2.writer(function (err) {
+      t.error(err)
+      var r = m1.replicate(true)
+      r.pipe(m2.replicate(false)).pipe(r)
+        .once('end', remove)
+    })
+  })
+
+  function remove () {
+    t.equals(m1.feeds().length, 2)
+    var feeds = m1.feeds()
+    var idx = feeds.length - 1
+    m1.removeFeed(idx, function (err) {
+      t.error(err)
+      check()
+    })
+  }
+
+  function check () {
+    t.equals(m1.feeds().length, 1)
+    t.equals(m2.feeds().length, 2)
+  }
+})
+
+test('remove feed w/ key', function (t) {
+  t.plan(6)
+
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
+
+  m1.writer(function (err) {
+    t.error(err)
+    m2.writer(function (err) {
+      t.error(err)
+      var r = m1.replicate(true)
+      r.pipe(m2.replicate(false)).pipe(r)
+        .once('end', remove)
+    })
+  })
+
+  function remove () {
+    t.equals(m1.feeds().length, 2)
+    var feeds = m1.feeds()
+    var feed = feeds[feeds.length - 1]
+    var key = feed.key.toString('hex')
+    m1.removeFeed(key, function (err) {
+      t.error(err)
+      check()
+    })
+  }
+
+  function check () {
+    t.equals(m1.feeds().length, 1)
+    t.equals(m2.feeds().length, 2)
+  }
+})
+
+test('remove feed updates mux\'s knownFeeds()', function (t) {
+  t.plan(8)
+
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
+
+  m1.writer(function (err) {
+    t.error(err)
+    m2.writer(function (err) {
+      t.error(err)
+      var r = m1.replicate(true, { live: true })
+      r.pipe(m2.replicate(false, { live: true })).pipe(r)
+      setTimeout(remove, 1000)
+    })
+  })
+
+  function remove () {
+    var feeds = m1.feeds()
+    var idx = feeds.length - 1
+    var feed = feeds[idx]
+    var mux = m1._streams[0]
+    var key = feed.key.toString('hex')
+
+    // Force feed key to be available in mux localOffer. This would be true of
+    // future replications.
+    mux.offerFeeds([key])
+
+    // Check it exists before removing
+    t.equals(m1.feeds().length, 2)
+    t.notEquals(mux._localOffer.indexOf(key), -1)
+
+    m1.removeFeed(idx, function (err) {
+      t.error(err)
+      // Check it was removed from only m1
+      t.equals(mux._localOffer.indexOf(key), -1)
+      t.equals(m1.feeds().length, 1)
+      t.equals(m2.feeds().length, 2)
+    })
+  }
+})
+
 test('can provide custom encryption key', function (t) {
   t.plan(2)
 

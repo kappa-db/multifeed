@@ -92,6 +92,44 @@ Multifeed.prototype._addFeed = function (feed, name) {
   this._forwardLiveFeedAnnouncements(feed, name)
 }
 
+Multifeed.prototype.removeFeed = function (nameOrKey, cb) {
+  if (typeof cb !== 'function') cb = function noop () {}
+
+  var self = this
+
+  var feed = null
+  var name = null
+  var key = null
+
+  if (nameOrKey in self._feeds) {
+    name = nameOrKey
+    feed = self._feeds[name]
+    key = feed.key.toString('hex')
+  } else {
+    key = nameOrKey
+    feed = self._feedKeyToFeed[key]
+    name = Object.keys(self._feeds).find(key => self._feeds[key] === feed)
+  }
+
+  delete self._feeds[name]
+  delete self._feedKeyToFeed[key]
+
+  // Remove from mux offering
+  self._streams.forEach((mux) => {
+    var idx = mux._localOffer.indexOf(key)
+    if (idx !== -1) {
+      mux._localOffer.splice(idx, 1)
+    }
+  })
+
+  self.writerLock(function (release) {
+    feed.destroyStorage(function (err) {
+      if (err) return self.emit('error', err)
+      release(cb)
+    })
+  })
+}
+
 Multifeed.prototype.ready = function (cb) {
   this._ready(cb)
 }
