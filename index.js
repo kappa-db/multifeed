@@ -222,6 +222,7 @@ Multifeed.prototype._loadFeeds = function (cb) {
           } else {
             self._addFeed(feed, String(dir))
           }
+          self._dirs[dir] = feed
           st.close(function (err) {
             if (err) return done(err)
             debug(self._id + ' [INIT] loaded feed #' + dir)
