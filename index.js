@@ -240,7 +240,7 @@ Multifeed.prototype._loadFeeds = function (cb) {
     if (!--pending) cb()
   }
 
-  var indexSt = self._storage('index')('names')
+  var indexSt = self._storage('index')('dirs')
 
   readStringFromStorage(indexSt, function (err, dirs) {
     if (err) {

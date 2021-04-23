@@ -247,6 +247,49 @@ test('get localfeed by name across disk loads', function (t) {
   })
 })
 
+test('load all feeds from disk after removing one', function (t) {
+  t.plan(14)
+
+  var storage = tmp()
+  var multi = multifeed(storage, { valueEncoding: 'json' })
+
+  multi.writer('foo', function (err, wFoo) {
+    t.error(err)
+    t.ok(wFoo.key)
+
+    multi.writer('bar', function (err, wBar) {
+      t.error(err)
+      t.ok(wBar.key)
+      wBar.append('a')
+
+      multi.writer('baz', function (err, wBaz) {
+        t.error(err)
+        t.ok(wBaz.key)
+
+        multi.removeFeed('bar', function () {
+          t.deepEquals(multi.feeds().length, 2, 'baz successfully deleted')
+
+          multi.close(function () {
+            var multi2 = multifeed(storage, { valueEncoding: 'json' })
+            multi2.writer('foo', function (err, wFoo2) {
+              t.error(err)
+              t.ok(wFoo2.key)
+              t.deepEquals(multi2.feeds().length, 2)
+              t.deepEquals(wFoo2.key, wFoo.key, 'keys match')
+
+              multi2.writer('baz', function (err, wBaz2) {
+                t.error(err)
+                t.ok(wBaz2.key)
+                t.deepEquals(wBaz2.key, wBaz.key, 'keys match')
+              })
+            })
+          })
+        })
+      })
+    })
+  })
+})
+
 test('close', function (t) {
   var storage = tmp()
   var multi = multifeed(storage, { valueEncoding: 'json' })
