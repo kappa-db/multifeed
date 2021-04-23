@@ -469,12 +469,25 @@ Multifeed.prototype._forwardLiveFeedAnnouncements = function (feed, name) {
   })
 }
 
-// TODO: what if the new data is shorter than the old data? things will break!
 function writeStringToStorage (string, storage, cb) {
-  var buf = Buffer.from(string, 'utf8')
-  storage.write(0, buf, function (err) {
-    storage.close(function (err2) {
-      cb(err || err2)
+  function writeBuffer () {
+    var buf = Buffer.from(string, 'utf8')
+    storage.write(0, buf, function (err) {
+      storage.close(function (err2) {
+        cb(err || err2)
+      })
+    })
+  }
+
+  // Check if data already exists
+  storage.stat(function (err, stat) {
+    if (err) return writeBuffer()
+
+    var len = stat.size
+    storage.del(0, len, function (err) {
+      if (err) return cb(err)
+
+      writeBuffer()
     })
   })
 }
