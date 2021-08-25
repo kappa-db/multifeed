@@ -204,7 +204,7 @@ Multifeed.prototype._loadFeeds = function (cb) {
 
   var pending = 1
   function next (dir) {
-    if (!dir) return done()
+    if (!dir && typeof dir !== 'number') return done()
 
     var storage = self._storage('' + dir)
     var st = storage('key')

@@ -290,6 +290,43 @@ test('load all feeds from disk after removing one', function (t) {
   })
 })
 
+test('load all feeds from legacy storage', function (t) {
+  t.plan(9)
+
+  var storage = tmp()
+  var multi = multifeed(storage, { valueEncoding: 'json' })
+
+  // Create a legacy storage structure by creating two feeds & deleting the
+  // index.
+  multi.writer(function (err, wFoo) {
+    t.error(err, 'no error getting writer')
+    t.ok(wFoo.key, 'got a key')
+
+    // Add second feed to highlight that feeds aren't loaded
+    // This is necessary because `writer()` implicitly loads a feed by
+    // "creating" it.
+    multi.writer('foo', function (err, wBar) {
+      t.error(err, 'no error getting second feed')
+      t.ok(wBar.key, 'got a key')
+      t.deepEquals(multi.feeds().length, 2, 'now have 2 feeds')
+
+      // Remove index to replicate legacy storage configuration
+      multi._storage('index')('dirs').destroy(function () {
+        multi.close(function () {
+          var multi2 = multifeed(storage, { valueEncoding: 'json' })
+          multi2.writer(function (err, wFoo2) {
+            t.error(err)
+            t.ok(wFoo2.key)
+            console.log('multi2._feeds', multi2._feeds)
+            t.deepEquals(multi2.feeds().length, 2)
+            t.deepEquals(wFoo2.key, wFoo.key, 'keys match')
+          })
+        })
+      })
+    })
+  })
+})
+
 test('close', function (t) {
   var storage = tmp()
   var multi = multifeed(storage, { valueEncoding: 'json' })
