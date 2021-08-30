@@ -250,6 +250,9 @@ Multifeed.prototype._loadFeeds = function (cb) {
       doneOnErr = false
       dirs = dirs.split(',')
 
+      // Update max dir on load
+      self._max_dir = Math.max.apply(null, dirs.map(Number))
+
       nextDir = function (dir) {
         var idx = dirs.indexOf(dir)
         if (idx < dirs.length - 1) {
