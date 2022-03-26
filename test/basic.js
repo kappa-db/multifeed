@@ -247,6 +247,86 @@ test('get localfeed by name across disk loads', function (t) {
   })
 })
 
+test('load all feeds from disk after removing one', function (t) {
+  t.plan(14)
+
+  var storage = tmp()
+  var multi = multifeed(storage, { valueEncoding: 'json' })
+
+  multi.writer('foo', function (err, wFoo) {
+    t.error(err)
+    t.ok(wFoo.key)
+
+    multi.writer('bar', function (err, wBar) {
+      t.error(err)
+      t.ok(wBar.key)
+      wBar.append('a')
+
+      multi.writer('baz', function (err, wBaz) {
+        t.error(err)
+        t.ok(wBaz.key)
+
+        multi.removeFeed('bar', function () {
+          t.deepEquals(multi.feeds().length, 2, 'baz successfully deleted')
+
+          multi.close(function () {
+            var multi2 = multifeed(storage, { valueEncoding: 'json' })
+            multi2.writer('foo', function (err, wFoo2) {
+              t.error(err)
+              t.ok(wFoo2.key)
+              t.deepEquals(multi2.feeds().length, 2)
+              t.deepEquals(wFoo2.key, wFoo.key, 'keys match')
+
+              multi2.writer('baz', function (err, wBaz2) {
+                t.error(err)
+                t.ok(wBaz2.key)
+                t.deepEquals(wBaz2.key, wBaz.key, 'keys match')
+              })
+            })
+          })
+        })
+      })
+    })
+  })
+})
+
+test('load all feeds from legacy storage', function (t) {
+  t.plan(9)
+
+  var storage = tmp()
+  var multi = multifeed(storage, { valueEncoding: 'json' })
+
+  // Create a legacy storage structure by creating two feeds & deleting the
+  // index.
+  multi.writer(function (err, wFoo) {
+    t.error(err, 'no error getting writer')
+    t.ok(wFoo.key, 'got a key')
+
+    // Add second feed to highlight that feeds aren't loaded
+    // This is necessary because `writer()` implicitly loads a feed by
+    // "creating" it.
+    multi.writer('foo', function (err, wBar) {
+      t.error(err, 'no error getting second feed')
+      t.ok(wBar.key, 'got a key')
+      t.deepEquals(multi.feeds().length, 2, 'now have 2 feeds')
+
+      // Remove index to replicate legacy storage configuration
+      multi._storage('index')('dirs').destroy(function () {
+        multi.close(function () {
+          var multi2 = multifeed(storage, { valueEncoding: 'json' })
+          multi2.writer(function (err, wFoo2) {
+            t.error(err)
+            t.ok(wFoo2.key)
+            console.log('multi2._feeds', multi2._feeds)
+            t.deepEquals(multi2.feeds().length, 2)
+            t.deepEquals(wFoo2.key, wFoo.key, 'keys match')
+          })
+        })
+      })
+    })
+  })
+})
+
 test('close', function (t) {
   var storage = tmp()
   var multi = multifeed(storage, { valueEncoding: 'json' })
@@ -287,6 +367,112 @@ test('close after double-open', function (t) {
         t.error(err)
         multi.close(cb)
       })
+    })
+  }
+})
+
+test('remove feed w/ name', function (t) {
+  t.plan(6)
+
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
+
+  m1.writer(function (err) {
+    t.error(err)
+    m2.writer(function (err) {
+      t.error(err)
+      var r = m1.replicate(true)
+      r.pipe(m2.replicate(false)).pipe(r)
+        .once('end', remove)
+    })
+  })
+
+  function remove () {
+    t.equals(m1.feeds().length, 2)
+    var feeds = m1.feeds()
+    var idx = feeds.length - 1
+    m1.removeFeed(idx, function (err) {
+      t.error(err)
+      check()
+    })
+  }
+
+  function check () {
+    t.equals(m1.feeds().length, 1)
+    t.equals(m2.feeds().length, 2)
+  }
+})
+
+test('remove feed w/ key', function (t) {
+  t.plan(6)
+
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
+
+  m1.writer(function (err) {
+    t.error(err)
+    m2.writer(function (err) {
+      t.error(err)
+      var r = m1.replicate(true)
+      r.pipe(m2.replicate(false)).pipe(r)
+        .once('end', remove)
+    })
+  })
+
+  function remove () {
+    t.equals(m1.feeds().length, 2)
+    var feeds = m1.feeds()
+    var feed = feeds[feeds.length - 1]
+    var key = feed.key.toString('hex')
+    m1.removeFeed(key, function (err) {
+      t.error(err)
+      check()
+    })
+  }
+
+  function check () {
+    t.equals(m1.feeds().length, 1)
+    t.equals(m2.feeds().length, 2)
+  }
+})
+
+test('remove feed updates mux\'s knownFeeds()', function (t) {
+  t.plan(8)
+
+  var m1 = multifeed(ram, { valueEncoding: 'json' })
+  var m2 = multifeed(ram, { valueEncoding: 'json' })
+
+  m1.writer(function (err) {
+    t.error(err)
+    m2.writer(function (err) {
+      t.error(err)
+      var r = m1.replicate(true, { live: true })
+      r.pipe(m2.replicate(false, { live: true })).pipe(r)
+      setTimeout(remove, 1000)
+    })
+  })
+
+  function remove () {
+    var feeds = m1.feeds()
+    var idx = feeds.length - 1
+    var feed = feeds[idx]
+    var mux = m1._streams[0]
+    var key = feed.key.toString('hex')
+
+    // Force feed key to be available in mux localOffer. This would be true of
+    // future replications.
+    mux.offerFeeds([key])
+
+    // Check it exists before removing
+    t.equals(m1.feeds().length, 2)
+    t.notEquals(mux._localOffer.indexOf(key), -1)
+
+    m1.removeFeed(idx, function (err) {
+      t.error(err)
+      // Check it was removed from only m1
+      t.equals(mux._localOffer.indexOf(key), -1)
+      t.equals(m1.feeds().length, 1)
+      t.equals(m2.feeds().length, 2)
     })
   }
 })
