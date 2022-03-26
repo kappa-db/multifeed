@@ -248,10 +248,10 @@ Multifeed.prototype._loadFeeds = function (cb) {
       next(0)
     } else {
       doneOnErr = false
-      dirs = dirs.split(',')
+      dirs = dirs ? dirs.split(',') : []
 
       // Update max dir on load
-      self._max_dir = Math.max.apply(null, dirs.map(Number))
+      self._max_dir = Math.max.apply(null, dirs.map(Number).concat(self._max_dir))
 
       nextDir = function (dir) {
         var idx = dirs.indexOf(dir)
