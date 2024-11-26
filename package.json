@@ -15,6 +15,7 @@
   },
   "keywords": [],
   "dependencies": {
+    "async-series": "0.0.1",
     "debug": "^4.1.0",
     "hypercore": "^9.6.0",
     "hypercore-protocol": "^8.0.7",
