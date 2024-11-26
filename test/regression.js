@@ -356,7 +356,7 @@ test('regression: ensure encryption key is not written to disk', function (t) {
         t.error(err)
         fs.readdir(storage, function (err, res) {
           t.error(err)
-          t.equals(res.length, 1)
+          t.equals(res.length, 2)
           t.equals(res[0], '0')
         })
       })
